@@ -7,9 +7,10 @@ from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 
 import curator
+import met_client
 import narrator
 import tts
-from config import HAS_CLAUDE, HAS_TTS
+from config import HAS_CLAUDE, HAS_TTS, WORDS_PER_MINUTE
 from themes import theme_list
 
 app = Flask(__name__)
@@ -43,9 +44,15 @@ def itinerary():
 
     stops = curator.build_itinerary(minutes, themes, level, must_see)
 
-    # Generate narration scripts concurrently (fast when using the fallback; with
-    # Claude this overlaps the per-stop latency).
+    # Hydrate the image URL for each chosen stop and generate its narration, both
+    # concurrently. Images are fetched here (not baked into the pool) so we only ever
+    # pull the ~15-25 images a tour actually uses, never the whole on-view collection.
     def make(stop):
+        obj = met_client.get_object(stop["objectID"])
+        if obj:
+            img = obj.get("primaryImageSmall") or obj.get("primaryImage") or ""
+            stop["image"] = img
+            stop["imageLarge"] = obj.get("primaryImage") or img
         result = narrator.generate_script(stop, themes, level, vibe)
         stop["script"] = result["script"]
         stop["estSeconds"] = result["estSeconds"]
@@ -55,6 +62,14 @@ def itinerary():
     if stops:
         with ThreadPoolExecutor(max_workers=min(8, len(stops))) as ex:
             stops = list(ex.map(make, stops))
+
+    # Weave the walking cue into the narration audio so the guide leads you onward,
+    # then onto the next stop. The cue is also exposed separately for the UI.
+    for s in stops:
+        cue = s.get("transition")
+        if cue:
+            s["script"] = f"{s['script'].rstrip()} {cue}"
+            s["estSeconds"] = max(15, int(len(s["script"].split()) / WORDS_PER_MINUTE * 60))
 
     # Total tour time = listening + walking/viewing buffer per stop.
     from config import WALK_BUFFER_MINUTES

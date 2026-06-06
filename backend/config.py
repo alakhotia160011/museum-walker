@@ -18,16 +18,47 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 load_dotenv(BASE_DIR / ".env")
 
-# --- MET scope: a few departments with strong on-view, image-rich highlights ---
+# --- MET scope: the full museum. Every collecting department; we seed all of
+# their *on-view, imaged* works so the guide can route you through the real galleries.
 DEPARTMENTS = {
-    11: "European Paintings",
+    1: "The American Wing",
+    3: "Ancient Near Eastern Art",
+    4: "Arms and Armor",
+    5: "Arts of Africa, Oceania, and the Americas",
+    6: "Asian Art",
+    7: "The Cloisters",
+    8: "The Costume Institute",
+    9: "Drawings and Prints",
     10: "Egyptian Art",
+    11: "European Paintings",
+    12: "European Sculpture and Decorative Arts",
+    13: "Greek and Roman Art",
     14: "Islamic Art",
+    15: "The Robert Lehman Collection",
+    16: "The Libraries",
+    17: "Medieval Art",
+    18: "Musical Instruments",
+    19: "Photographs",
+    21: "Modern and Contemporary Art",
 }
-# How many candidate objects to pull per department when seeding the pool.
-SEED_PER_DEPARTMENT = 25
+# Per-department cap when seeding. None = no cap (take every on-view, imaged work).
+SEED_PER_DEPARTMENT = None
+# Source of bulk metadata: the Met's Open Access dataset (Git LFS CSV on GitHub).
+# Lets us hydrate metadata for the whole on-view set without per-object API calls.
+OPENACCESS_CSV_URL = (
+    "https://media.githubusercontent.com/media/metmuseum/openaccess/master/MetObjects.csv"
+)
 
 MET_API_BASE = "https://collectionapi.metmuseum.org/public/collection/v1"
+
+# --- Path coherence: how many departments (wings) a single tour may span, by time.
+# Keeps a walk geographically tight instead of scattering across the museum.
+def department_budget(minutes: int) -> int:
+    if minutes <= 25:
+        return 1
+    if minutes <= 60:
+        return 2
+    return 3
 
 # --- Timing model (minutes) -------------------------------------------------
 # Average listening time per stop by knowledge level, plus walking/viewing buffer.

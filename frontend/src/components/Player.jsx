@@ -121,6 +121,13 @@ export default function Player({ stops, index, setIndex, hasTts, vibe, onBack })
         <button className="ctrl" onClick={() => go(1)} disabled={index === stops.length - 1}>⏭</button>
       </div>
 
+      {stop.transition && (
+        <div className="walk-cue">
+          <span className="walk-icon">🚶</span>
+          <span>{stop.transition}</span>
+        </div>
+      )}
+
       <button className="transcript-toggle" onClick={() => setShowTranscript((v) => !v)}>
         {showTranscript ? "Hide transcript" : "Show transcript"}
       </button>

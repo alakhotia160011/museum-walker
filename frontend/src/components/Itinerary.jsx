@@ -1,5 +1,6 @@
 export default function Itinerary({ tour, onOpen, onRestart }) {
   const { meta, stops } = tour;
+  const wings = [...new Set(stops.map((s) => s.department).filter(Boolean))];
   return (
     <div className="screen itinerary">
       <header className="itin-head">
@@ -10,6 +11,9 @@ export default function Itinerary({ tour, onOpen, onRestart }) {
           {meta.themes.length ? meta.themes.join(" · ") : "A bit of everything"}
         </p>
         <p className="sub small">Level: {meta.level} · Voice: {meta.vibe}</p>
+        {wings.length > 0 && (
+          <p className="sub small">Route: {wings.join(" → ")}</p>
+        )}
       </header>
 
       <ol className="stop-list">
