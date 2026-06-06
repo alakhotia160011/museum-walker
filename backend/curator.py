@@ -131,71 +131,86 @@ def transition_line(current: dict, nxt: dict | None) -> str:
     return f"Now we'll move on. Make your way to {where} for our next stop, {title}."
 
 
-def build_itinerary(minutes: int, themes: list[str], level: str, must_see: bool) -> list[dict]:
+# How many extra candidates to pull beyond N, so app.py can drop imageless works
+# and still fill the tour.
+_IMAGE_BUFFER = 14
+
+
+def _build_stop(obj: dict, themes: list[str], words: int, est_seconds: int) -> dict:
+    return {
+        "stopId": f"{obj['objectID']}",
+        "objectID": obj["objectID"],
+        "title": obj["title"],
+        "artist": obj["artist"],
+        "date": obj["date"],
+        "medium": obj["medium"],
+        "department": obj["department"],
+        "departmentId": obj.get("departmentId"),
+        "gallery": obj["gallery"],
+        "metUrl": obj.get("metUrl", ""),
+        "isHighlight": obj.get("isHighlight", False),
+        "tags": obj.get("tags", []),
+        "themeMatch": score_themes(obj, themes),
+        "targetWords": words,
+        "estSeconds": est_seconds,
+        # script is generated on demand (/api/narrate); image lazily (app.py);
+        # lat/lng/floor/floorId/building are attached by geo.order_route.
+        "script": "",
+        "image": "",
+        "imageLarge": "",
+    }
+
+
+def select_candidates(minutes: int, themes: list[str], level: str, must_see: bool):
+    """Pick the works for a tour. Returns (n, candidates) where `candidates` is a ranked
+    list of up to n + buffer stop dicts (unordered, no narration) so the caller can drop
+    imageless works and still assemble n imaged stops."""
     pool = load_pool()
     if not pool:
-        return []
+        return 0, []
 
     n = min(num_stops(minutes, level), len(pool))
     allowed = _pick_departments(pool, themes, department_budget(minutes))
     candidates = [o for o in pool if o.get("departmentId") in allowed] or pool
+    cap = min(len(candidates), n + _IMAGE_BUFFER)
 
     ranked = sorted(candidates, key=lambda o: _score(o, themes), reverse=True)
-
     chosen: list[dict] = []
     chosen_ids: set[int] = set()
 
-    # Must-see highlights first (within the chosen wings, kept inside the budget).
     if must_see:
         for obj in sorted(candidates, key=lambda o: (not o.get("isHighlight"), -_score(o, themes))):
-            if len(chosen) >= n or not obj.get("isHighlight"):
+            if len(chosen) >= cap or not obj.get("isHighlight"):
                 break
             if obj["objectID"] not in chosen_ids:
                 chosen.append(obj)
                 chosen_ids.add(obj["objectID"])
 
-    # Fill remaining slots by theme/highlight score.
     for obj in ranked:
-        if len(chosen) >= n:
+        if len(chosen) >= cap:
             break
         if obj["objectID"] not in chosen_ids:
             chosen.append(obj)
             chosen_ids.add(obj["objectID"])
 
     words = target_words(level)
-    est_seconds_per_stop = int(words / WORDS_PER_MINUTE * 60)
-    stops = []
-    for obj in chosen:
-        stops.append(
-            {
-                "stopId": f"{obj['objectID']}",
-                "objectID": obj["objectID"],
-                "title": obj["title"],
-                "artist": obj["artist"],
-                "date": obj["date"],
-                "medium": obj["medium"],
-                "department": obj["department"],
-                "departmentId": obj.get("departmentId"),
-                "gallery": obj["gallery"],
-                "metUrl": obj.get("metUrl", ""),
-                "isHighlight": obj.get("isHighlight", False),
-                "tags": obj.get("tags", []),
-                "themeMatch": score_themes(obj, themes),
-                "targetWords": words,
-                "estSeconds": est_seconds_per_stop,
-                # image / imageLarge are filled in lazily by app.py;
-                # lat/lng/floor/floorId/building are attached by geo.order_route.
-                "image": "",
-                "imageLarge": "",
-            }
-        )
+    est = int(words / WORDS_PER_MINUTE * 60)
+    return n, [_build_stop(o, themes, words, est) for o in chosen]
 
-    # Order into a walkable sequence (coords + floors), then number the stops.
+
+def finalize(stops: list[dict]) -> list[dict]:
+    """Order the chosen stops into a walkable route, number them, and attach walking cues."""
     stops = geo.order_route(stops, _gallery_key)
     for i, s in enumerate(stops):
         s["index"] = i
-
-    # Attach a walking cue from each stop to the next (now floor-aware).
     for i, s in enumerate(stops):
         s["transition"] = transition_line(s, stops[i + 1] if i + 1 < len(stops) else None)
+    return stops
+
+
+def build_itinerary(minutes: int, themes: list[str], level: str, must_see: bool) -> list[dict]:
+    """Convenience for offline use/tests: select n works and finalize the route
+    (no image filtering, no narration). The API hydrates images and narration separately."""
+    n, candidates = select_candidates(minutes, themes, level, must_see)
+    stops = finalize(candidates[:n])
     return stops

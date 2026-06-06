@@ -10,7 +10,7 @@ import curator
 import met_client
 import narrator
 import tts
-from config import HAS_CLAUDE, HAS_TTS, WORDS_PER_MINUTE
+from config import HAS_CLAUDE, HAS_TTS
 from themes import theme_list
 
 app = Flask(__name__)
@@ -43,36 +43,28 @@ def itinerary():
     eras = body.get("eras") or []
     must_see = bool(body.get("mustSee", True))
 
-    stops = curator.build_itinerary(minutes, themes, level, must_see)
+    # Pick more candidates than we need, then drop any without an image so the tour is
+    # never padded with "image unavailable" plates. Narration is NOT generated here — it's
+    # produced per stop on demand (/api/narrate) so the route appears fast.
+    n, candidates = curator.select_candidates(minutes, themes, level, must_see)
 
-    # Hydrate the image URL for each chosen stop and generate its narration, both
-    # concurrently. Images are fetched here (not baked into the pool) so we only ever
-    # pull the ~15-25 images a tour actually uses, never the whole on-view collection.
-    def make(stop):
+    def hydrate(stop):
         obj = met_client.get_object(stop["objectID"])
         if obj:
             img = obj.get("primaryImageSmall") or obj.get("primaryImage") or ""
             stop["image"] = img
             stop["imageLarge"] = obj.get("primaryImage") or img
-        result = narrator.generate_script(stop, themes, level, vibe)
-        stop["script"] = result["script"]
-        stop["estSeconds"] = result["estSeconds"]
-        stop["scriptSource"] = result["source"]
         return stop
 
-    if stops:
-        with ThreadPoolExecutor(max_workers=min(8, len(stops))) as ex:
-            stops = list(ex.map(make, stops))
+    if candidates:
+        with ThreadPoolExecutor(max_workers=min(12, len(candidates))) as ex:
+            candidates = list(ex.map(hydrate, candidates))
 
-    # Weave the walking cue into the narration audio so the guide leads you onward,
-    # then onto the next stop. The cue is also exposed separately for the UI.
-    for s in stops:
-        cue = s.get("transition")
-        if cue:
-            s["script"] = f"{s['script'].rstrip()} {cue}"
-            s["estSeconds"] = max(15, int(len(s["script"].split()) / WORDS_PER_MINUTE * 60))
+    imaged = [c for c in candidates if c.get("image")]
+    keep = imaged[:n] if len(imaged) >= n else (imaged + [c for c in candidates if not c.get("image")])[:n]
+    stops = curator.finalize(keep)
 
-    # Total tour time = listening + walking/viewing buffer per stop.
+    # Total tour time = listening + walking/viewing buffer per stop (target-based estimate).
     from config import WALK_BUFFER_MINUTES
 
     total_seconds = sum(s["estSeconds"] for s in stops) + int(len(stops) * WALK_BUFFER_MINUTES * 60)
@@ -92,6 +84,27 @@ def itinerary():
             "stops": stops,
         }
     )
+
+
+@app.post("/api/narrate")
+def narrate():
+    """Generate the spoken narration for a single stop, on demand. The walking cue
+    (stop.transition) is appended so the guide leads you onward in the audio."""
+    body = request.get_json(force=True) or {}
+    stop = body.get("stop") or {}
+    themes = body.get("themes") or []
+    level = body.get("level", "Casual")
+    vibe = body.get("vibe", "Storyteller")
+    result = narrator.generate_script(stop, themes, level, vibe)
+    script = result["script"]
+    cue = (stop.get("transition") or "").strip()
+    spoken = f"{script.rstrip()} {cue}".strip() if cue else script
+    return jsonify({
+        "script": script,        # printed essay (no walking cue)
+        "spoken": spoken,        # what the voice reads (narration + walking cue)
+        "source": result["source"],
+        "estSeconds": result["estSeconds"],
+    })
 
 
 @app.post("/api/ask")

@@ -22,6 +22,17 @@ export async function buildItinerary(prefs) {
   return r.json();
 }
 
+// Generate a stop's narration on demand. Returns { script, spoken, source, estSeconds }.
+export async function narrate({ stop, themes, level, vibe }) {
+  const r = await fetch(`${BASE}/api/narrate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ stop, themes, level, vibe }),
+  });
+  if (!r.ok) throw new Error("narrate failed");
+  return r.json();
+}
+
 // Ask the docent a question about the current artwork. Returns { answer, source }.
 export async function askDocent({ stop, question, level, vibe, themes, eras, history, nextStop }) {
   const r = await fetch(`${BASE}/api/ask`, {

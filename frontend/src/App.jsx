@@ -10,6 +10,7 @@ export default function App() {
   const [config, setConfig] = useState({ hasTts: false, hasClaude: false });
   const [themes, setThemes] = useState([]);
   const [tour, setTour] = useState(null);
+  const [tourReady, setTourReady] = useState(false);
   const [activeStop, setActiveStop] = useState(0);
   const [error, setError] = useState("");
 
@@ -20,16 +21,14 @@ export default function App() {
 
   async function compose(prefs) {
     setError("");
+    setTour(null);
+    setTourReady(false);
     setScreen("curating");
-    const started = Date.now();
     try {
       const result = await buildItinerary(prefs);
-      // let the curating transition breathe even when the route returns instantly
-      const elapsed = Date.now() - started;
-      if (elapsed < 1500) await new Promise((r) => setTimeout(r, 1500 - elapsed));
       setTour(result);
       setActiveStop(0);
-      setScreen("route");
+      setTourReady(true); // the game stays up; the user taps "Enter" when ready
     } catch (e) {
       setError("The route couldn't be composed. Is the backend running?");
       setScreen("compose");
@@ -47,7 +46,9 @@ export default function App() {
       {screen === "compose" && (
         <Compose themes={themes} onCompose={compose} error={error} />
       )}
-      {screen === "curating" && <Curating />}
+      {screen === "curating" && (
+        <Curating ready={tourReady} onEnter={() => setScreen("route")} />
+      )}
       {screen === "route" && tour && (
         <Route tour={tour} onOpen={openStop} onRestart={() => setScreen("compose")} />
       )}
