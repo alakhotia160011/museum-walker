@@ -3,7 +3,7 @@ import { fetchAudioUrl, askDocent } from "../api.js";
 
 const SUGGESTED = ["Tell me more about the artist", "What should I look for?", "Where do I go next?"];
 
-export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, level, themes, next, onBack }) {
+export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, level, themes, eras, next, onBack }) {
   const stop = stops[index];
   const [playing, setPlaying] = useState(false);
   const [loadingAudio, setLoadingAudio] = useState(false);
@@ -48,7 +48,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
     setDraft("");
     setAsking(true);
     try {
-      const { answer } = await askDocent({ stop, question: q, level, vibe, themes, history, nextStop: next });
+      const { answer } = await askDocent({ stop, question: q, level, vibe, themes, eras, history, nextStop: next });
       setThread((t) => [...t, { role: "assistant", content: answer }]);
     } catch (e) {
       setThread((t) => [...t, { role: "assistant", content: "Sorry — I couldn't reach the docent just now. Try again in a moment." }]);

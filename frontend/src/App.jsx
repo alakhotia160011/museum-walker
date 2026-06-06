@@ -61,6 +61,7 @@ export default function App() {
           vibe={tour.meta?.vibe}
           level={tour.meta?.level}
           themes={tour.meta?.themes}
+          eras={tour.meta?.eras}
           next={tour.stops[activeStop + 1] || null}
           onBack={() => setScreen("route")}
         />

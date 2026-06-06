@@ -23,11 +23,11 @@ export async function buildItinerary(prefs) {
 }
 
 // Ask the docent a question about the current artwork. Returns { answer, source }.
-export async function askDocent({ stop, question, level, vibe, themes, history, nextStop }) {
+export async function askDocent({ stop, question, level, vibe, themes, eras, history, nextStop }) {
   const r = await fetch(`${BASE}/api/ask`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ stop, question, level, vibe, themes, history, nextStop }),
+    body: JSON.stringify({ stop, question, level, vibe, themes, eras, history, nextStop }),
   });
   if (!r.ok) throw new Error("ask failed");
   return r.json();

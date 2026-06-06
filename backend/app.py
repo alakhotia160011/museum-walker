@@ -40,6 +40,7 @@ def itinerary():
     themes = body.get("themes") or []
     level = body.get("level", "Casual")
     vibe = body.get("vibe", "Storyteller")
+    eras = body.get("eras") or []
     must_see = bool(body.get("mustSee", True))
 
     stops = curator.build_itinerary(minutes, themes, level, must_see)
@@ -82,6 +83,7 @@ def itinerary():
                 "themes": themes,
                 "level": level,
                 "vibe": vibe,
+                "eras": eras,
                 "mustSee": must_see,
                 "stopCount": len(stops),
                 "estMinutes": round(total_seconds / 60, 1),
@@ -107,6 +109,7 @@ def ask():
         level=body.get("level", "Casual"),
         vibe=body.get("vibe", "Storyteller"),
         themes=body.get("themes") or [],
+        eras=body.get("eras") or [],
         history=body.get("history") or [],
         next_stop=body.get("nextStop"),
     )

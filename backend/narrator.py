@@ -151,18 +151,32 @@ def answer_question(
     level: str = "Casual",
     vibe: str = "Storyteller",
     themes: list[str] | None = None,
+    eras: list[str] | None = None,
     history: list[dict] | None = None,
     next_stop: dict | None = None,
 ) -> dict:
-    """Answer a visitor's question about the current artwork in the docent's voice.
+    """Answer a visitor's question about the current artwork in the docent's voice,
+    tuned to the visitor's tastes (themes = type of art, eras = time periods).
     Returns {'answer': str, 'source': 'claude'|'fallback'}."""
     themes = themes or []
+    eras = eras or []
     if not HAS_CLAUDE:
         return {"answer": _qa_fallback(stop, question, next_stop), "source": "fallback"}
 
     persona = VIBES.get(vibe, VIBES["Storyteller"])
     level_note = LEVEL_GUIDANCE.get(level, LEVEL_GUIDANCE["Casual"])
     tags = ", ".join(stop.get("tags", [])[:8])
+    taste = []
+    if themes:
+        taste.append(f"kinds of art: {', '.join(themes)}")
+    if eras:
+        taste.append(f"time periods: {', '.join(eras)}")
+    taste_line = (
+        f"This visitor is especially drawn to {'; '.join(taste)}. Where it's honest and "
+        f"relevant, connect your answer to those interests (e.g. how this work relates to "
+        f"that period or theme) — but never force it or invent connections.\n"
+        if taste else ""
+    )
     nxt = ""
     if next_stop:
         g = next_stop.get("gallery")
@@ -182,6 +196,7 @@ def answer_question(
         f"- Gallery: {stop.get('gallery')}\n"
         f"- Subject tags: {tags}\n"
         f"The narration you already gave the visitor:\n\"{(stop.get('script') or '').strip()}\"\n"
+        f"{taste_line}"
         f"Voice: {persona}. Listener level: {level}. {level_note}{nxt}\n\n"
         f"Answer the visitor's question."
     )

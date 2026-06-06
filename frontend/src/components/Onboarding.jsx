@@ -3,6 +3,7 @@ import { useState } from "react";
 const TIMES = [20, 45, 90];
 const LEVELS = ["Casual", "Enthusiast", "Expert"];
 const VIBES = ["Storyteller", "Art historian", "Quick hits", "Kid-friendly"];
+const ERAS = ["Ancient", "Medieval", "Renaissance", "Baroque", "18th–19th c.", "Modern"];
 
 // mirrors curator.py timing so the visitor sees a derived stop count
 const LISTEN = { Casual: 1.5, Enthusiast: 2.5, Expert: 3.5 };
@@ -15,10 +16,13 @@ export default function Compose({ themes, onCompose, error }) {
   const [selected, setSelected] = useState([]);
   const [level, setLevel] = useState("Casual");
   const [vibe, setVibe] = useState("Storyteller");
+  const [eras, setEras] = useState([]);
   const [mustSee, setMustSee] = useState(true);
 
   const toggleTheme = (id) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const toggleEra = (e) =>
+    setEras((s) => (s.includes(e) ? s.filter((x) => x !== e) : [...s, e]));
 
   const Chip = ({ on, onClick, children, title }) => (
     <button type="button" className="chip" aria-pressed={on} onClick={onClick} title={title}>
@@ -72,6 +76,14 @@ export default function Compose({ themes, onCompose, error }) {
               </Chip>
             ))}
           </div>
+          <div className="field-group">
+            <p className="field-label">Periods you're drawn to</p>
+            <div className="chips">
+              {ERAS.map((e) => (
+                <Chip key={e} on={eras.includes(e)} onClick={() => toggleEra(e)}>{e}</Chip>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="section">
@@ -108,7 +120,7 @@ export default function Compose({ themes, onCompose, error }) {
       <div className="actionbar">
         <button
           className="cta"
-          onClick={() => onCompose({ minutes, themes: selected, level, vibe, mustSee })}
+          onClick={() => onCompose({ minutes, themes: selected, level, vibe, eras, mustSee })}
         >
           Compose the route <span className="arrow">→</span>
         </button>
