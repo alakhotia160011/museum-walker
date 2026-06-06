@@ -59,6 +59,9 @@ export default function App() {
           hasTts={tour.meta?.hasTts}
           hasClaude={config.hasClaude}
           vibe={tour.meta?.vibe}
+          level={tour.meta?.level}
+          themes={tour.meta?.themes}
+          next={tour.stops[activeStop + 1] || null}
           onBack={() => setScreen("route")}
         />
       )}

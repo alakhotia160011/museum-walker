@@ -92,6 +92,27 @@ def itinerary():
     )
 
 
+@app.post("/api/ask")
+def ask():
+    """Answer a visitor's question about the current artwork in the docent voice.
+    Stateless: the client posts the stop it's on plus a short conversation history."""
+    body = request.get_json(force=True) or {}
+    question = (body.get("question") or "").strip()
+    if not question:
+        return jsonify({"error": "missing question"}), 400
+    stop = body.get("stop") or {}
+    result = narrator.answer_question(
+        stop,
+        question,
+        level=body.get("level", "Casual"),
+        vibe=body.get("vibe", "Storyteller"),
+        themes=body.get("themes") or [],
+        history=body.get("history") or [],
+        next_stop=body.get("nextStop"),
+    )
+    return jsonify({"answer": result["answer"], "source": result["source"]})
+
+
 @app.post("/api/audio")
 def audio():
     """Synthesize (or serve cached) speech for a script. Stateless: the client posts

@@ -243,7 +243,7 @@ h1, h2, h3 { font-family: var(--serif); font-optical-sizing: auto; font-weight: 
 .stop-row .star { color: var(--ink); }
 
 /* ---------- stop (player) ---------- */
-.stop { display: grid; gap: clamp(20px, 3vw, 30px); grid-template-areas: "head" "wall" "plate" "player" "essay" "onward" "nav"; }
+.stop { display: grid; gap: clamp(20px, 3vw, 30px); grid-template-areas: "head" "wall" "plate" "player" "essay" "onward" "ask" "nav"; }
 .stop-head { grid-area: head; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .stop-head .where { font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 
@@ -295,6 +295,34 @@ h1, h2, h3 { font-family: var(--serif); font-optical-sizing: auto; font-weight: 
 .onward .eyebrow { margin-bottom: 8px; }
 .onward p { margin: 0; font-size: 14.5px; color: var(--ink-2); max-width: 52ch; }
 
+/* ask the docent */
+.ask { grid-area: ask; border-top: 1px solid var(--line); padding-top: 18px; }
+.ask .eyebrow { margin-bottom: 12px; }
+.ask-suggestions { margin-bottom: 16px; }
+.ask-suggestions .chip { font-size: 13px; padding: 8px 14px; }
+.ask-thread { display: flex; flex-direction: column; gap: 18px; margin-bottom: 18px; }
+.ask-q { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: var(--ink-3); }
+.ask-q::before { content: "“"; } .ask-q::after { content: "”"; }
+.ask-a { margin: 0; }
+.ask-a p { font-family: var(--serif); font-optical-sizing: auto; font-size: 17px; line-height: 1.65; color: var(--ink); margin: 4px 0 8px; }
+.ask-play { background: none; border: 0; padding: 0; color: var(--ink-3); font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.ask-play:hover { color: var(--ink); }
+.ask-thinking { font-size: 13px; color: var(--ink-3); font-style: italic; margin: 0 0 14px; }
+.ask-form { display: flex; gap: 10px; }
+.ask-input {
+  flex: 1; appearance: none; background: transparent;
+  border: 1px solid var(--line-2); border-radius: 4px;
+  padding: 11px 14px; font-family: var(--sans); font-size: 15px; color: var(--ink);
+}
+.ask-input::placeholder { color: var(--ink-3); }
+.ask-input:focus { outline: none; border-color: var(--ink); }
+.ask-send {
+  flex: 0 0 auto; background: var(--ink); color: var(--paper); border: 1px solid var(--ink);
+  border-radius: 4px; padding: 0 20px; font-family: var(--sans); font-size: 13px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.ask-send:disabled { opacity: 0.4; }
+
 .stopnav { grid-area: nav; display: flex; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); padding-top: 20px; }
 .stopnav button { background: none; border: 0; text-align: left; max-width: 46%; }
 .stopnav button:disabled { opacity: 0.35; }
@@ -313,6 +341,7 @@ h1, h2, h3 { font-family: var(--serif); font-optical-sizing: auto; font-weight: 
       "plate essay"
       "player essay"
       "onward onward"
+      "ask    ask"
       "nav    nav";
     align-items: start;
   }

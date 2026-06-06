@@ -22,6 +22,17 @@ export async function buildItinerary(prefs) {
   return r.json();
 }
 
+// Ask the docent a question about the current artwork. Returns { answer, source }.
+export async function askDocent({ stop, question, level, vibe, themes, history, nextStop }) {
+  const r = await fetch(`${BASE}/api/ask`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ stop, question, level, vibe, themes, history, nextStop }),
+  });
+  if (!r.ok) throw new Error("ask failed");
+  return r.json();
+}
+
 // Returns an object URL for the mp3, or null if the server has no TTS (use browser voice).
 export async function fetchAudioUrl(text, vibe) {
   const r = await fetch(`${BASE}/api/audio`, {

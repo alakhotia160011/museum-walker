@@ -25,6 +25,7 @@ from config import (
     department_budget,
 )
 from themes import score_themes
+import geo
 
 _POOL: list[dict] | None = None
 
@@ -84,24 +85,50 @@ def _pick_departments(pool: list[dict], themes: list[str], max_depts: int) -> se
     return set(ranked[:max_depts])
 
 
+_FLOOR_NAME = {
+    "Floor G": "the ground floor",
+    "Floor 1": "the first floor",
+    "Floor 1M": "the mezzanine",
+    "Floor 2": "the second floor",
+    "Floor 3": "the third floor",
+    "Floor 4": "the fourth floor",
+    "Floor 5": "the fifth floor",
+}
+
+
 def transition_line(current: dict, nxt: dict | None) -> str:
     """A short, accurate spoken cue for walking from `current` to the next stop.
-    Directions are gallery-/wing-based (the only location data the Met publishes)."""
+    Uses real floor data (attached by geo.order_route) when available; otherwise
+    falls back to gallery-/wing-based wording. Never invents left/right directions."""
     if nxt is None:
         return "That's the last stop on your path. Take your time, and enjoy the rest of the Met."
     title = nxt["title"]
     g_now = str(current.get("gallery") or "")
     g_next = str(nxt.get("gallery") or "")
-    same_dept = current.get("departmentId") == nxt.get("departmentId")
+    here = f"Gallery {g_next}" if g_next else "the next room"
+
+    # Different building (rare; never say "stairs" across a 9.5km gap).
+    if current.get("building") and nxt.get("building") and current["building"] != nxt["building"]:
+        return f"Our next stop is over at {nxt['building']} — {here}, for {title}."
+
+    # Same gallery.
     if g_next and g_now and g_next == g_now:
         return f"Our next piece is right here in this gallery. Turn and look for {title}."
-    if same_dept:
-        where = f"Gallery {g_next}" if g_next else f"the next room in {nxt['department']}"
-        return f"When you're ready, head to {where}, where {title} is waiting."
-    where = f"{nxt['department']}"
-    if g_next:
-        where += f", Gallery {g_next}"
-    return f"Now we'll leave this wing. Make your way to {where} for our next stop, {title}."
+
+    # Floor-aware, when both stops have a known floor.
+    fc, fn = current.get("floorId"), nxt.get("floorId")
+    if fc is not None and fn is not None and fc != fn:
+        direction = "up" if fn > fc else "down"
+        floor_name = _FLOOR_NAME.get(nxt.get("floor") or "", nxt.get("floor") or "the next floor")
+        return f"Take the stairs {direction} to {floor_name} and find {here}, where {title} is waiting."
+
+    # Same floor (or floors unknown but same department) — short walk.
+    if (fc is not None and fc == fn) or current.get("departmentId") == nxt.get("departmentId"):
+        return f"When you're ready, continue on this floor to {here}, where {title} is waiting."
+
+    # Fallback: cross-department without floor data.
+    where = nxt["department"] + (f", Gallery {g_next}" if g_next else "")
+    return f"Now we'll move on. Make your way to {where} for our next stop, {title}."
 
 
 def build_itinerary(minutes: int, themes: list[str], level: str, must_see: bool) -> list[dict]:
@@ -135,17 +162,13 @@ def build_itinerary(minutes: int, themes: list[str], level: str, must_see: bool)
             chosen.append(obj)
             chosen_ids.add(obj["objectID"])
 
-    # Order the selected stops by proximity (department, then gallery).
-    chosen.sort(key=_gallery_key)
-
     words = target_words(level)
     est_seconds_per_stop = int(words / WORDS_PER_MINUTE * 60)
     stops = []
-    for i, obj in enumerate(chosen):
+    for obj in chosen:
         stops.append(
             {
                 "stopId": f"{obj['objectID']}",
-                "index": i,
                 "objectID": obj["objectID"],
                 "title": obj["title"],
                 "artist": obj["artist"],
@@ -160,13 +183,19 @@ def build_itinerary(minutes: int, themes: list[str], level: str, must_see: bool)
                 "themeMatch": score_themes(obj, themes),
                 "targetWords": words,
                 "estSeconds": est_seconds_per_stop,
-                # image / imageLarge are filled in lazily by app.py
+                # image / imageLarge are filled in lazily by app.py;
+                # lat/lng/floor/floorId/building are attached by geo.order_route.
                 "image": "",
                 "imageLarge": "",
             }
         )
 
-    # Attach a walking cue from each stop to the next.
+    # Order into a walkable sequence (coords + floors), then number the stops.
+    stops = geo.order_route(stops, _gallery_key)
+    for i, s in enumerate(stops):
+        s["index"] = i
+
+    # Attach a walking cue from each stop to the next (now floor-aware).
     for i, s in enumerate(stops):
         s["transition"] = transition_line(s, stops[i + 1] if i + 1 < len(stops) else None)
     return stops

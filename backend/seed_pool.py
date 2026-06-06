@@ -16,7 +16,9 @@ Run once (re-run to refresh):  python seed_pool.py
 from __future__ import annotations
 
 import csv
+import html
 import json
+import re
 import sys
 
 import requests
@@ -62,15 +64,31 @@ def ensure_csv() -> bool:
         return False
 
 
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _clean(s: str) -> str:
+    """Met titles/fields sometimes carry HTML (often double-escaped, e.g.
+    '&lt;i&gt;Gusoku&lt;/i&gt;'). Unescape and strip tags so they read as plain text."""
+    s = (s or "").strip()
+    if not s:
+        return ""
+    prev = None
+    while prev != s:  # handle double-escaping (&amp;lt; -> &lt; -> <)
+        prev = s
+        s = html.unescape(s)
+    return _TAG_RE.sub("", s).strip()
+
+
 def _slim(row: dict) -> dict:
     dept_name = (row.get("Department") or "").strip()
-    tags = [t.strip() for t in (row.get("Tags") or "").split("|") if t.strip()]
+    tags = [_clean(t) for t in (row.get("Tags") or "").split("|") if t.strip()]
     return {
         "objectID": int(row["Object ID"]),
-        "title": (row.get("Title") or "").strip() or "Untitled",
-        "artist": (row.get("Artist Display Name") or row.get("Culture") or "").strip() or "Unknown",
-        "date": (row.get("Object Date") or "").strip(),
-        "medium": (row.get("Medium") or "").strip(),
+        "title": _clean(row.get("Title")) or "Untitled",
+        "artist": _clean(row.get("Artist Display Name") or row.get("Culture")) or "Unknown",
+        "date": _clean(row.get("Object Date")),
+        "medium": _clean(row.get("Medium")),
         "department": dept_name,
         "departmentId": _NAME_TO_ID.get(_norm(dept_name), 0),
         "gallery": (row.get("Gallery Number") or "").strip(),

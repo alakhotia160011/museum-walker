@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchAudioUrl } from "../api.js";
+import { fetchAudioUrl, askDocent } from "../api.js";
 
-export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, onBack }) {
+const SUGGESTED = ["Tell me more about the artist", "What should I look for?", "Where do I go next?"];
+
+export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, level, themes, next, onBack }) {
   const stop = stops[index];
-  const next = stops[index + 1];
   const [playing, setPlaying] = useState(false);
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [progress, setProgress] = useState(0);
   const [imgError, setImgError] = useState(false);
+  const [thread, setThread] = useState([]); // [{role:'user'|'assistant', content}]
+  const [draft, setDraft] = useState("");
+  const [asking, setAsking] = useState(false);
   const audioRef = useRef(null);
   const audioUrlRef = useRef(null);
+  const answerAudioRef = useRef(null);
 
   // The narration audio includes the spoken walking cue; the printed essay does not.
   const essay =
@@ -19,6 +24,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
 
   function stopAll() {
     if (audioRef.current) audioRef.current.pause();
+    if (answerAudioRef.current) answerAudioRef.current.pause();
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     setPlaying(false);
     setProgress(0);
@@ -27,9 +33,47 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
   useEffect(() => {
     stopAll();
     setImgError(false);
+    setThread([]);
+    setDraft("");
+    setAsking(false);
     return stopAll;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
+
+  async function ask(question) {
+    const q = question.trim();
+    if (!q || asking) return;
+    const history = thread;
+    setThread((t) => [...t, { role: "user", content: q }]);
+    setDraft("");
+    setAsking(true);
+    try {
+      const { answer } = await askDocent({ stop, question: q, level, vibe, themes, history, nextStop: next });
+      setThread((t) => [...t, { role: "assistant", content: answer }]);
+    } catch (e) {
+      setThread((t) => [...t, { role: "assistant", content: "Sorry — I couldn't reach the docent just now. Try again in a moment." }]);
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  // Speak an answer aloud — ElevenLabs when available, else the browser voice.
+  async function speakAnswer(text) {
+    stopAll();
+    if (hasTts) {
+      const url = await fetchAudioUrl(text, vibe);
+      if (url && answerAudioRef.current) {
+        answerAudioRef.current.src = url;
+        answerAudioRef.current.play();
+        return;
+      }
+    }
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = vibe === "Quick hits" ? 1.12 : 1.0;
+      window.speechSynthesis.speak(u);
+    }
+  }
 
   async function play() {
     if (hasTts) {
@@ -142,6 +186,49 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
           <p>{stop.transition}</p>
         </div>
 
+        <div className="ask">
+          <p className="eyebrow">Ask the docent</p>
+          <div className="chips ask-suggestions">
+            {SUGGESTED.map((q) => (
+              <button key={q} type="button" className="chip" onClick={() => ask(q)} disabled={asking}>
+                {q}
+              </button>
+            ))}
+          </div>
+
+          {thread.length > 0 && (
+            <div className="ask-thread">
+              {thread.map((m, i) =>
+                m.role === "user" ? (
+                  <p key={i} className="ask-q">{m.content}</p>
+                ) : (
+                  <div key={i} className="ask-a">
+                    <p>{m.content}</p>
+                    <button className="ask-play" onClick={() => speakAnswer(m.content)} aria-label="Hear this answer">
+                      ▶ Hear this
+                    </button>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+          {asking && <p className="ask-thinking">The docent is thinking…</p>}
+
+          <form
+            className="ask-form"
+            onSubmit={(e) => { e.preventDefault(); ask(draft); }}
+          >
+            <input
+              className="ask-input"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Ask anything about this work…"
+              disabled={asking}
+            />
+            <button className="ask-send" type="submit" disabled={asking || !draft.trim()}>Ask</button>
+          </form>
+        </div>
+
         <nav className="stopnav">
           <button onClick={() => go(-1)} disabled={index === 0}>
             <span className="dir">← Previous</span>
@@ -160,6 +247,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
         onEnded={() => { setPlaying(false); setProgress(1); }}
         hidden
       />
+      <audio ref={answerAudioRef} hidden />
     </div>
   );
 }
