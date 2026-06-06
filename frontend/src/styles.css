@@ -112,7 +112,7 @@ h1, h2, h3 { font-family: var(--serif); font-optical-sizing: auto; font-weight: 
   letter-spacing: -0.015em;
   margin: 10px 0 14px;
 }
-.masthead .colophon { font-size: 13px; color: var(--ink-3); max-width: 46ch; margin: 14px 0 0; }
+.masthead .colophon { font-size: 13px; color: var(--ink-3); max-width: 46ch; margin: 14px 0 0 clamp(24px, 5vw, 56px); }
 .masthead .colophon a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
 
 .lede {
