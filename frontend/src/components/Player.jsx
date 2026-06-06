@@ -5,7 +5,7 @@ const SUGGESTED = ["Why did you make this?", "What should I look for?", "Where d
 const CAN_RECORD = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia &&
   typeof window !== "undefined" && "MediaRecorder" in window;
 
-export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, level, themes, eras, next, onBack }) {
+export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, level, themes, eras, language, next, onBack }) {
   const stop = stops[index];
   const [narration, setNarration] = useState(null); // { script, spoken, source }
   const [loadingNarration, setLoadingNarration] = useState(true);
@@ -76,7 +76,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
     let cancelled = false;
     (async () => {
       try {
-        const n = await narrate({ stop, themes, level, vibe });
+        const n = await narrate({ stop, themes, level, vibe, language });
         if (cancelled) return;
         setNarration(n);
         setLoadingNarration(false);
@@ -116,7 +116,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
     setDraft("");
     setAsking(true);
     try {
-      const { answer } = await askDocent({ stop, question: q, level, vibe, themes, eras, history, nextStop: next });
+      const { answer } = await askDocent({ stop, question: q, level, vibe, themes, eras, history, nextStop: next, language });
       setThread((t) => [...t, { role: "assistant", content: answer }]);
       speak(answer, { voiceId: narration?.voiceId }); // answer in the artist's own voice
     } catch (e) {

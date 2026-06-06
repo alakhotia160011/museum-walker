@@ -4,6 +4,7 @@ const TIMES = [20, 45, 90];
 const LEVELS = ["Casual", "Enthusiast", "Expert"];
 const VIBES = ["Storyteller", "Art historian", "Quick hits", "Kid-friendly"];
 const ERAS = ["Ancient", "Medieval", "Renaissance", "Baroque", "18th–19th c.", "Modern"];
+const LANGUAGES = ["English", "Spanish", "French", "German", "Italian", "Mandarin", "Japanese", "Hindi"];
 
 // mirrors curator.py timing so the visitor sees a derived stop count
 const LISTEN = { Casual: 1.5, Enthusiast: 2.5, Expert: 3.5 };
@@ -17,6 +18,7 @@ export default function Compose({ themes, onCompose, error }) {
   const [level, setLevel] = useState("Casual");
   const [vibe, setVibe] = useState("Storyteller");
   const [eras, setEras] = useState([]);
+  const [language, setLanguage] = useState("English");
   const [mustSee, setMustSee] = useState(true);
 
   const toggleTheme = (id) =>
@@ -109,6 +111,17 @@ export default function Compose({ themes, onCompose, error }) {
               ))}
             </div>
           </div>
+          <div className="field-group">
+            <p className="field-label">Language</p>
+            <div className="chips">
+              {LANGUAGES.map((l) => (
+                <Chip key={l} on={language === l} onClick={() => setLanguage(l)}>{l}</Chip>
+              ))}
+            </div>
+            {language !== "English" && (
+              <p className="field-note">Narration and answers in {language}. Voices use a neutral multilingual voice (artist-accent matching is English-only).</p>
+            )}
+          </div>
 
           <label className="toggle">
             <input type="checkbox" checked={mustSee} onChange={(e) => setMustSee(e.target.checked)} />
@@ -122,7 +135,7 @@ export default function Compose({ themes, onCompose, error }) {
       <div className="actionbar">
         <button
           className="cta"
-          onClick={() => onCompose({ minutes, themes: selected, level, vibe, eras, mustSee })}
+          onClick={() => onCompose({ minutes, themes: selected, level, vibe, eras, language, mustSee })}
         >
           Compose the route <span className="arrow">→</span>
         </button>

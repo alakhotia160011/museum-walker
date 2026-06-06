@@ -63,6 +63,7 @@ export default function App() {
           level={tour.meta?.level}
           themes={tour.meta?.themes}
           eras={tour.meta?.eras}
+          language={tour.meta?.language}
           next={tour.stops[activeStop + 1] || null}
           onBack={() => setScreen("route")}
         />

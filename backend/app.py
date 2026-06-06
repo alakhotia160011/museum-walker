@@ -43,6 +43,7 @@ def itinerary():
     level = body.get("level", "Casual")
     vibe = body.get("vibe", "Storyteller")
     eras = body.get("eras") or []
+    language = body.get("language", "English")
     must_see = bool(body.get("mustSee", True))
 
     # Pick more candidates than we need, then drop any without an image so the tour is
@@ -81,6 +82,7 @@ def itinerary():
                 "level": level,
                 "vibe": vibe,
                 "eras": eras,
+                "language": language,
                 "mustSee": must_see,
                 "stopCount": len(stops),
                 "estMinutes": round(total_seconds / 60, 1),
@@ -100,13 +102,16 @@ def narrate():
     themes = body.get("themes") or []
     level = body.get("level", "Casual")
     vibe = body.get("vibe", "Storyteller")
+    language = body.get("language", "English")
+    english = (language or "English").strip().lower() == "english"
     # Resolve the artist's voice in parallel with writing the script so picking a
-    # gender/age/accent-matched voice adds no latency to the narration response.
+    # gender/age/accent-matched voice adds no latency. Accent-matching is English-only —
+    # for other languages we use the default multilingual voice (no forced accent).
     with ThreadPoolExecutor(max_workers=2) as ex:
-        f_script = ex.submit(narrator.generate_script, stop, themes, level, vibe)
-        f_voice = ex.submit(voices.voice_for_stop, stop)
+        f_script = ex.submit(narrator.generate_script, stop, themes, level, vibe, language)
+        f_voice = ex.submit(voices.voice_for_stop, stop) if english else None
         result = f_script.result()
-        voice_id = f_voice.result()
+        voice_id = f_voice.result() if f_voice else None
     script = result["script"]
     cue = (stop.get("transition") or "").strip()
     spoken = f"{script.rstrip()} {cue}".strip() if cue else script
@@ -130,6 +135,7 @@ def intro():
         vibe=body.get("vibe", "Storyteller"),
         themes=body.get("themes") or [],
         eras=body.get("eras") or [],
+        language=body.get("language", "English"),
     )
     return jsonify({"intro": result["intro"], "source": result["source"]})
 
@@ -152,6 +158,7 @@ def ask():
         eras=body.get("eras") or [],
         history=body.get("history") or [],
         next_stop=body.get("nextStop"),
+        language=body.get("language", "English"),
     )
     return jsonify({"answer": result["answer"], "source": result["source"]})
 

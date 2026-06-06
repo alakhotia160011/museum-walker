@@ -23,33 +23,33 @@ export async function buildItinerary(prefs) {
 }
 
 // A spoken welcome orienting the visitor before the first stop. Returns { intro, source }.
-export async function routeIntro({ summary, level, vibe, themes, eras }) {
+export async function routeIntro({ summary, level, vibe, themes, eras, language }) {
   const r = await fetch(`${BASE}/api/intro`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ summary, level, vibe, themes, eras }),
+    body: JSON.stringify({ summary, level, vibe, themes, eras, language }),
   });
   if (!r.ok) throw new Error("intro failed");
   return r.json();
 }
 
-// Generate a stop's narration on demand. Returns { script, spoken, source, estSeconds }.
-export async function narrate({ stop, themes, level, vibe }) {
+// Generate a stop's narration on demand. Returns { script, spoken, source, estSeconds, voiceId }.
+export async function narrate({ stop, themes, level, vibe, language }) {
   const r = await fetch(`${BASE}/api/narrate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ stop, themes, level, vibe }),
+    body: JSON.stringify({ stop, themes, level, vibe, language }),
   });
   if (!r.ok) throw new Error("narrate failed");
   return r.json();
 }
 
 // Ask the docent a question about the current artwork. Returns { answer, source }.
-export async function askDocent({ stop, question, level, vibe, themes, eras, history, nextStop }) {
+export async function askDocent({ stop, question, level, vibe, themes, eras, history, nextStop, language }) {
   const r = await fetch(`${BASE}/api/ask`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ stop, question, level, vibe, themes, eras, history, nextStop }),
+    body: JSON.stringify({ stop, question, level, vibe, themes, eras, history, nextStop, language }),
   });
   if (!r.ok) throw new Error("ask failed");
   return r.json();

@@ -46,7 +46,7 @@ export default function Route({ tour, onOpen, onRestart }) {
       estMinutes: meta.estMinutes,
     };
     let cancelled = false;
-    routeIntro({ summary, level: meta.level, vibe: meta.vibe, themes: meta.themes, eras: meta.eras })
+    routeIntro({ summary, level: meta.level, vibe: meta.vibe, themes: meta.themes, eras: meta.eras, language: meta.language })
       .then((r) => { if (!cancelled) { setIntro(r.intro); speak(r.intro); } })
       .catch(() => {});
     return () => { cancelled = true; stopSpeak(); };
