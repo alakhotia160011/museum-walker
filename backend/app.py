@@ -10,6 +10,7 @@ import curator
 import met_client
 import narrator
 import tts
+import voices
 from config import HAS_CLAUDE, HAS_TTS
 from themes import theme_list
 
@@ -98,7 +99,13 @@ def narrate():
     themes = body.get("themes") or []
     level = body.get("level", "Casual")
     vibe = body.get("vibe", "Storyteller")
-    result = narrator.generate_script(stop, themes, level, vibe)
+    # Resolve the artist's voice in parallel with writing the script so picking a
+    # gender/age/accent-matched voice adds no latency to the narration response.
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        f_script = ex.submit(narrator.generate_script, stop, themes, level, vibe)
+        f_voice = ex.submit(voices.voice_for_stop, stop)
+        result = f_script.result()
+        voice_id = f_voice.result()
     script = result["script"]
     cue = (stop.get("transition") or "").strip()
     spoken = f"{script.rstrip()} {cue}".strip() if cue else script
@@ -107,6 +114,7 @@ def narrate():
         "spoken": spoken,        # what the voice reads (narration + walking cue)
         "source": result["source"],
         "estSeconds": result["estSeconds"],
+        "voiceId": voice_id,     # the matched artist voice for /api/audio
     })
 
 
@@ -154,9 +162,10 @@ def audio():
     body = request.get_json(force=True) or {}
     text = (body.get("text") or "").strip()
     vibe = body.get("vibe", "Storyteller")
+    voice_id = body.get("voiceId")
     if not text:
         return jsonify({"error": "missing text"}), 400
-    path = tts.synth(text, vibe)
+    path = tts.synth(text, vibe, voice_id)
     if not path:
         return ("", 204)  # signal: client should use browser speech synthesis
     return send_file(path, mimetype="audio/mpeg")

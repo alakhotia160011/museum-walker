@@ -56,11 +56,12 @@ export async function askDocent({ stop, question, level, vibe, themes, eras, his
 }
 
 // Returns an object URL for the mp3, or null if the server has no TTS (use browser voice).
-export async function fetchAudioUrl(text, vibe) {
+// `voiceId` selects the artist-matched ElevenLabs voice (from the narrate response).
+export async function fetchAudioUrl(text, vibe, voiceId) {
   const r = await fetch(`${BASE}/api/audio`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text, vibe }),
+    body: JSON.stringify({ text, vibe, voiceId }),
   });
   if (r.status === 204) return null;
   if (!r.ok) return null;

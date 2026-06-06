@@ -28,12 +28,12 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
   }
 
   // Speak text aloud: ElevenLabs when available, else the browser voice.
-  async function speak(text, { isNarration } = {}) {
+  async function speak(text, { isNarration, voiceId } = {}) {
     stopVoice();
     if (hasTts) {
       let url = isNarration ? narrationUrlRef.current : null;
       if (!url) {
-        url = await fetchAudioUrl(text, vibe);
+        url = await fetchAudioUrl(text, vibe, voiceId);
         if (isNarration) narrationUrlRef.current = url;
       }
       if (url) {
@@ -73,7 +73,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
         if (cancelled) return;
         setNarration(n);
         setLoadingNarration(false);
-        speak(n.spoken || n.script, { isNarration: true }); // auto-play the guide's voice
+        speak(n.spoken || n.script, { isNarration: true, voiceId: n.voiceId }); // auto-play the artist's voice
       } catch (e) {
         if (!cancelled) setLoadingNarration(false);
       }
@@ -91,7 +91,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
   function resume() {
     if (audioRef.current?.src && audioRef.current.paused) { audioRef.current.play(); setPlaying(true); return; }
     if (window.speechSynthesis?.paused) { window.speechSynthesis.resume(); setPlaying(true); return; }
-    if (narration) speak(narration.spoken || narration.script, { isNarration: true });
+    if (narration) speak(narration.spoken || narration.script, { isNarration: true, voiceId: narration.voiceId });
   }
 
   function go(delta) {
@@ -111,7 +111,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
     try {
       const { answer } = await askDocent({ stop, question: q, level, vibe, themes, eras, history, nextStop: next });
       setThread((t) => [...t, { role: "assistant", content: answer }]);
-      speak(answer); // speak the answer aloud
+      speak(answer, { voiceId: narration?.voiceId }); // answer in the artist's own voice
     } catch (e) {
       setThread((t) => [...t, { role: "assistant", content: "Sorry - I couldn't reach the artist just now." }]);
     } finally {
@@ -216,7 +216,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
                 ) : (
                   <div key={i} className="ask-a">
                     <p>{m.content}</p>
-                    <button className="ask-play" onClick={() => speak(m.content)}>▶ Hear again</button>
+                    <button className="ask-play" onClick={() => speak(m.content, { voiceId: narration?.voiceId })}>▶ Hear again</button>
                   </div>
                 )
               )}
