@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchAudioUrl, askDocent, narrate } from "../api.js";
 
-const SUGGESTED = ["Tell me more about the artist", "What should I look for?", "Where do I go next?"];
+const SUGGESTED = ["Why did you make this?", "What should I look for?", "Where do I go next?"];
 const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
 export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, level, themes, eras, next, onBack }) {
@@ -113,7 +113,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
       setThread((t) => [...t, { role: "assistant", content: answer }]);
       speak(answer); // speak the answer aloud
     } catch (e) {
-      setThread((t) => [...t, { role: "assistant", content: "Sorry - I couldn't reach the docent just now." }]);
+      setThread((t) => [...t, { role: "assistant", content: "Sorry - I couldn't reach the artist just now." }]);
     } finally {
       setAsking(false);
     }
@@ -136,7 +136,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
 
   const essay = loadingNarration ? "Composing this stop…" : (narration?.script || "");
   const caption =
-    `${(narration?.source === "claude") ? "Story by Claude" : "Story from the label"}` +
+    `${(narration?.source === "claude") ? "In the artist's words, by Claude" : "In the artist's words, from the label"}` +
     ` · ${hasTts ? "voiced by ElevenLabs" : "voiced in your browser"}`;
 
   return (
@@ -195,7 +195,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
         </div>
 
         <div className="ask">
-          <p className="eyebrow">Ask the docent</p>
+          <p className="eyebrow">Ask the artist</p>
           <div className="ask-bar">
             <button className={`mic ${listening ? "live" : ""}`} onClick={listen} disabled={asking}>
               <span className="mic-dot" />
@@ -222,7 +222,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
               )}
             </div>
           )}
-          {asking && <p className="ask-thinking">The docent is thinking…</p>}
+          {asking && <p className="ask-thinking">The artist is thinking…</p>}
 
           <form className="ask-form" onSubmit={(e) => { e.preventDefault(); ask(draft); }}>
             <input className="ask-input" value={draft} onChange={(e) => setDraft(e.target.value)}

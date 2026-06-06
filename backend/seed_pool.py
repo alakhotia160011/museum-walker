@@ -117,6 +117,10 @@ def main() -> None:
                 obj = _slim(row)
             except (KeyError, ValueError):
                 continue
+            # Keep only public-domain works: they reliably have CC0 images (sampled
+            # ~100% vs ~12% for non-PD), so the guide never shows a blank plate.
+            if not obj["isPublicDomain"]:
+                continue
             if SEED_PER_DEPARTMENT:
                 d = obj["departmentId"]
                 if per_dept.get(d, 0) >= SEED_PER_DEPARTMENT:

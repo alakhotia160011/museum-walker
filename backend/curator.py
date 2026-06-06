@@ -135,9 +135,10 @@ def transition_line(current: dict, nxt: dict | None) -> str:
     return f"Now we'll move on. Make your way to {where} for our next stop, {title}."
 
 
-# How many extra candidates to pull beyond N, so app.py can drop imageless works
-# and still fill the tour.
-_IMAGE_BUFFER = 14
+# A small over-select so app.py can drop the rare imageless work and still fill the
+# tour. The pool is public-domain-only (~100% imaged), so this can stay small — fewer
+# MET image fetches per tour also means less chance of hitting its rate limit.
+_IMAGE_BUFFER = 6
 
 
 def _build_stop(

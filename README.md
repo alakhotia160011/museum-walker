@@ -36,16 +36,21 @@ interactive Q&A layered on the player.
 - **Route optimization** ([`geo.py`](backend/geo.py)) - orders the stops for the
   shortest, least-stair-heavy walk. See [Optimizing for location](#optimizing-for-location).
 - **Narration** ([`narrator.py`](backend/narrator.py)) - Claude writes a spoken script
-  per stop, tuned to your themes / knowledge level / vibe, with a **floor-aware walking
-  cue** woven in ("take the stairs up to the second floor and find Gallery 824…").
-  Falls back to a readable template if no API key.
-- **Q&A** (`narrator.answer_question` → `POST /api/ask`) - ask the docent anything about
-  the current work; Claude answers in the docent voice, grounded in the metadata (no
+  per stop **in the first person, as the artist who made the work** ("I painted this the
+  summer I…"), tuned to your themes / knowledge level / vibe, with a **floor-aware walking
+  cue** woven in ("take the stairs up to the second floor and find Gallery 824…"). When the
+  maker is Unknown or a culture rather than a named person, it speaks as an unnamed maker of
+  that culture and time. Falls back to a readable first-person template if no API key.
+- **Q&A** (`narrator.answer_question` → `POST /api/ask`) - ask the artist anything about
+  the work; Claude answers **in that same first-person voice**, grounded in the metadata (no
   invented facts), and **tuned to your tastes** - the type of art (themes) and the time
   periods (eras) you chose at onboarding - with multi-turn follow-ups and "where do I go
   next?" support.
 - **Voice** ([`tts.py`](backend/tts.py)) - ElevenLabs synth, cached by content hash. No
   key → the browser's built-in speech synthesis. Q&A answers get their own play button.
+  One fixed voice (set by `ELEVENLABS_VOICE_ID`) speaks for every artist - the *words* are
+  in the artist's voice, but the *timbre* is the same narrator throughout. Per-artist voices
+  would need an artist→voice map and are not implemented.
 
 ## Optimizing for location
 

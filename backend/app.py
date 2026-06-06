@@ -107,6 +107,21 @@ def narrate():
     })
 
 
+@app.post("/api/intro")
+def intro():
+    """A spoken welcome that orients the visitor (where we start, which wings/floors,
+    the scope) before they dive into the first work."""
+    body = request.get_json(force=True) or {}
+    result = narrator.route_intro(
+        body.get("summary") or {},
+        level=body.get("level", "Casual"),
+        vibe=body.get("vibe", "Storyteller"),
+        themes=body.get("themes") or [],
+        eras=body.get("eras") or [],
+    )
+    return jsonify({"intro": result["intro"], "source": result["source"]})
+
+
 @app.post("/api/ask")
 def ask():
     """Answer a visitor's question about the current artwork in the docent voice.

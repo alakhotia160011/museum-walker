@@ -1,8 +1,57 @@
+import { useEffect, useRef, useState } from "react";
+import { routeIntro, fetchAudioUrl } from "../api.js";
+
 const runtime = (s) => `${Math.max(1, Math.round((s.estSeconds || 0) / 60))} min`;
+const distinct = (arr) => [...new Set(arr.filter(Boolean))];
 
 export default function Route({ tour, onOpen, onRestart }) {
   const { meta, stops } = tour;
-  const wings = [...new Set(stops.map((s) => s.department).filter(Boolean))];
+  const wings = distinct(stops.map((s) => s.department));
+  const [intro, setIntro] = useState(null);
+  const [speaking, setSpeaking] = useState(false);
+  const audioRef = useRef(null);
+
+  function stopSpeak() {
+    if (audioRef.current) audioRef.current.pause();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    setSpeaking(false);
+  }
+
+  async function speak(text) {
+    if (!text) return;
+    stopSpeak();
+    if (meta.hasTts) {
+      const url = await fetchAudioUrl(text, meta.vibe);
+      if (url && audioRef.current) {
+        audioRef.current.src = url;
+        try { await audioRef.current.play(); setSpeaking(true); } catch (e) { /* autoplay blocked */ }
+        return;
+      }
+    }
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance(text);
+      u.onend = () => setSpeaking(false);
+      window.speechSynthesis.speak(u);
+      setSpeaking(true);
+    }
+  }
+
+  useEffect(() => {
+    const s0 = stops[0] || {};
+    const summary = {
+      start: { title: s0.title, department: s0.department, gallery: s0.gallery, floor: s0.floor },
+      wings,
+      floors: distinct(stops.map((s) => s.floor)),
+      stopCount: meta.stopCount,
+      estMinutes: meta.estMinutes,
+    };
+    let cancelled = false;
+    routeIntro({ summary, level: meta.level, vibe: meta.vibe, themes: meta.themes, eras: meta.eras })
+      .then((r) => { if (!cancelled) { setIntro(r.intro); speak(r.intro); } })
+      .catch(() => {});
+    return () => { cancelled = true; stopSpeak(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="screen">
@@ -20,6 +69,18 @@ export default function Route({ tour, onOpen, onRestart }) {
             </span>
           </div>
         </header>
+
+        <div className="intro">
+          <button
+            className={`intro-play ${speaking ? "live" : ""}`}
+            onClick={() => (speaking ? stopSpeak() : speak(intro))}
+            disabled={!intro}
+            aria-label={speaking ? "Pause welcome" : "Hear welcome"}
+          >
+            {speaking ? "❚❚" : "▶"}
+          </button>
+          <p className="intro-text serif">{intro || "Your guide is gathering the welcome…"}</p>
+        </div>
 
         <ol className="itinerary">
           {stops.map((s, i) => (
@@ -44,10 +105,11 @@ export default function Route({ tour, onOpen, onRestart }) {
       </div>
 
       <div className="actionbar">
-        <button className="cta" onClick={() => onOpen(0)}>
+        <button className="cta" onClick={() => { stopSpeak(); onOpen(0); }}>
           Begin the walk <span className="arrow">→</span>
         </button>
       </div>
+      <audio ref={audioRef} onEnded={() => setSpeaking(false)} hidden />
     </div>
   );
 }

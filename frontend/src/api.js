@@ -22,6 +22,17 @@ export async function buildItinerary(prefs) {
   return r.json();
 }
 
+// A spoken welcome orienting the visitor before the first stop. Returns { intro, source }.
+export async function routeIntro({ summary, level, vibe, themes, eras }) {
+  const r = await fetch(`${BASE}/api/intro`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ summary, level, vibe, themes, eras }),
+  });
+  if (!r.ok) throw new Error("intro failed");
+  return r.json();
+}
+
 // Generate a stop's narration on demand. Returns { script, spoken, source, estSeconds }.
 export async function narrate({ stop, themes, level, vibe }) {
   const r = await fetch(`${BASE}/api/narrate`, {
