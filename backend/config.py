@@ -71,7 +71,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 CLAUDE_MODEL = "claude-sonnet-4-6"  # fast + cheap enough for many stops
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
-# "Rachel" — a common default ElevenLabs voice id.
+# "Rachel" - a common default ElevenLabs voice id.
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "").strip() or "21m00Tcm4TlvDq8ikWAM"
 ELEVENLABS_MODEL = "eleven_turbo_v2_5"
 

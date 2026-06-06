@@ -113,7 +113,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
       setThread((t) => [...t, { role: "assistant", content: answer }]);
       speak(answer); // speak the answer aloud
     } catch (e) {
-      setThread((t) => [...t, { role: "assistant", content: "Sorry — I couldn't reach the docent just now." }]);
+      setThread((t) => [...t, { role: "assistant", content: "Sorry - I couldn't reach the docent just now." }]);
     } finally {
       setAsking(false);
     }
@@ -121,7 +121,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
 
   function listen() {
     if (listening) { try { recRef.current?.stop(); } catch (e) {} return; }
-    if (!SR) return; // no speech recognition — text box is the fallback
+    if (!SR) return; // no speech recognition - text box is the fallback
     stopVoice(); // don't talk over the visitor
     const rec = new SR();
     recRef.current = rec;
@@ -199,7 +199,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
           <div className="ask-bar">
             <button className={`mic ${listening ? "live" : ""}`} onClick={listen} disabled={asking}>
               <span className="mic-dot" />
-              {listening ? "Listening — tap to stop" : (SR ? "Hold a question? Tap and speak" : "Ask a question below")}
+              {listening ? "Listening - tap to stop" : (SR ? "Hold a question? Tap and speak" : "Ask a question below")}
             </button>
           </div>
           <div className="chips ask-suggestions">

@@ -4,7 +4,7 @@ route between galleries without a live dependency at request time.
 
 The Met's map (maps.metmuseum.org) is a Living Map deployment whose tiles are served,
 unauthenticated, at prod.cdn.livingmap.com/tiles/the_met/{z}/{x}/{y}.pbf. Each gallery
-room is an `indoor` feature of type "gallery" whose `name` is its gallery number — the
+room is an `indoor` feature of type "gallery" whose `name` is its gallery number - the
 same value as the collection's "Gallery Number". We extract those, project the geometry
 to lat/lng, and write data/gallery_coords.json.
 

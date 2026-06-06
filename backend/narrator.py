@@ -24,7 +24,7 @@ _SYSTEM = (
     "You are the voice of a personalized museum audio guide at The Metropolitan Museum of Art. "
     "You write short spoken-word narration scripts for a single artwork, meant to be heard "
     "(not read) while the visitor stands in front of the piece. Speak directly to the listener. "
-    "No headings, no markdown, no stage directions, no 'welcome to'—just the narration itself. "
+    "No headings, no markdown, no stage directions, no 'welcome to', just the narration itself. "
     "Be accurate to the metadata provided; do not invent facts, signatures, or provenance."
 )
 
@@ -50,7 +50,7 @@ def _fallback_script(stop: dict, themes: list[str]) -> str:
     return (
         f"Take a moment with {title}. This piece is by {artist}, dating from {date}. "
         f"It's made in {medium}.{(' Notice the ' + tags + '.') if tags else ''} "
-        f"Let your eye travel across the composition—where does it rest first, and why might the "
+        f"Let your eye travel across the composition, where does it rest first, and why might the "
         f"artist have wanted it there?{theme_line} "
         f"When you're ready, take one last look, then move on to the next stop."
     )
@@ -117,9 +117,9 @@ _QA_SYSTEM = (
     "You are the voice of a personalized museum audio guide at The Metropolitan Museum of Art, "
     "standing beside the visitor in front of an artwork and answering their questions out loud. "
     "Speak directly to the listener in a warm, knowledgeable docent's voice. Keep answers short and "
-    "spoken — roughly 40 to 80 words, no headings, no markdown, no lists. Be accurate to the metadata "
+    "spoken - roughly 40 to 80 words, no headings, no markdown, no lists. Be accurate to the metadata "
     "and narration you are given; never invent facts, signatures, provenance, or attributions you "
-    "aren't sure of — if you don't know, say so briefly and offer what you can. For questions about "
+    "aren't sure of - if you don't know, say so briefly and offer what you can. For questions about "
     "where to go next, use the next-stop location provided. Gently redirect questions unrelated to the "
     "art or the museum."
 )
@@ -174,7 +174,7 @@ def answer_question(
     taste_line = (
         f"This visitor is especially drawn to {'; '.join(taste)}. Where it's honest and "
         f"relevant, connect your answer to those interests (e.g. how this work relates to "
-        f"that period or theme) — but never force it or invent connections.\n"
+        f"that period or theme) - but never force it or invent connections.\n"
         if taste else ""
     )
     nxt = ""

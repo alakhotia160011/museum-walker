@@ -19,7 +19,7 @@ from config import DATA_DIR
 
 _COORDS: dict | None = None
 
-# The Met Fifth Avenue main entrance / Great Hall — where a visit begins.
+# The Met Fifth Avenue main entrance / Great Hall - where a visit begins.
 GREAT_HALL = {"lat": 40.7794, "lng": -73.9632}
 
 
@@ -92,7 +92,7 @@ def order_route(stops: list[dict], fallback_key) -> list[dict]:
     """Return `stops` reordered into a walkable sequence. Mutates each stop to attach
     lat/lng/floor/floorId/building (None when no coordinate is known). Never drops a stop.
 
-    `fallback_key` is curator._gallery_key — used to order coordinate-less stops and as a
+    `fallback_key` is curator._gallery_key - used to order coordinate-less stops and as a
     whole-route fallback when no coordinates are available at all.
     """
     if not stops:

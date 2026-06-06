@@ -38,8 +38,10 @@ export default function Compose({ themes, onCompose, error }) {
           <h1 className="wordmark">Docent</h1>
           <hr className="rule" />
           <p className="colophon">
-            A self-guided audio walk. Tell me two things and I'll compose a route worth
-            your time. Artwork and collection data are public domain, courtesy of the{" "}
+            Your own voice docent. Tell me how long you have and what moves you, and I'll
+            compose a geospatially optimized route through the real galleries — least
+            backtracking, fewest stairs — narrate each stop aloud, and answer whatever you
+            ask. Artwork and collection data are public domain, courtesy of the{" "}
             <a href="https://metmuseum.github.io/" target="_blank" rel="noreferrer">
               Met Collection API
             </a>.

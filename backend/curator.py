@@ -109,7 +109,7 @@ def transition_line(current: dict, nxt: dict | None) -> str:
 
     # Different building (rare; never say "stairs" across a 9.5km gap).
     if current.get("building") and nxt.get("building") and current["building"] != nxt["building"]:
-        return f"Our next stop is over at {nxt['building']} — {here}, for {title}."
+        return f"Our next stop is over at {nxt['building']} - {here}, for {title}."
 
     # Same gallery.
     if g_next and g_now and g_next == g_now:
@@ -122,7 +122,7 @@ def transition_line(current: dict, nxt: dict | None) -> str:
         floor_name = _FLOOR_NAME.get(nxt.get("floor") or "", nxt.get("floor") or "the next floor")
         return f"Take the stairs {direction} to {floor_name} and find {here}, where {title} is waiting."
 
-    # Same floor (or floors unknown but same department) — short walk.
+    # Same floor (or floors unknown but same department) - short walk.
     if (fc is not None and fc == fn) or current.get("departmentId") == nxt.get("departmentId"):
         return f"When you're ready, continue on this floor to {here}, where {title} is waiting."
 
