@@ -1,0 +1,14 @@
+# secrets
+backend/.env
+
+# python
+__pycache__/
+*.pyc
+backend/.venv/
+
+# caches / generated audio (keep data/pool.json in git so demo works offline)
+backend/cache/
+
+# node
+frontend/node_modules/
+frontend/dist/
