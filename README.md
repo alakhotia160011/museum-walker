@@ -39,7 +39,9 @@ interactive Q&A layered on the player.
   Falls back to a readable template if no API key.
 - **Q&A** (`narrator.answer_question` → `POST /api/ask`) — ask the docent anything about
   the current work; Claude answers in the docent voice, grounded in the metadata (no
-  invented facts), with multi-turn follow-ups and "where do I go next?" support.
+  invented facts), and **tuned to your tastes** — the type of art (themes) and the time
+  periods (eras) you chose at onboarding — with multi-turn follow-ups and "where do I go
+  next?" support.
 - **Voice** ([`tts.py`](backend/tts.py)) — ElevenLabs synth, cached by content hash. No
   key → the browser's built-in speech synthesis. Q&A answers get their own play button.
 
