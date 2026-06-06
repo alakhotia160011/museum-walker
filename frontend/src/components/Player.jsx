@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchAudioUrl, askDocent, narrate } from "../api.js";
+import { fetchAudioUrl, askDocent, narrate, transcribe } from "../api.js";
 
 const SUGGESTED = ["Why did you make this?", "What should I look for?", "Where do I go next?"];
-const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+const CAN_RECORD = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia &&
+  typeof window !== "undefined" && "MediaRecorder" in window;
 
 export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, level, themes, eras, next, onBack }) {
   const stop = stops[index];
@@ -13,12 +14,16 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
   const [imgError, setImgError] = useState(false);
   const [thread, setThread] = useState([]); // [{role, content}]
   const [asking, setAsking] = useState(false);
-  const [listening, setListening] = useState(false);
+  const [listening, setListening] = useState(false);   // recording the mic
+  const [transcribing, setTranscribing] = useState(false);
+  const [micError, setMicError] = useState("");
   const [draft, setDraft] = useState("");
   const audioRef = useRef(null);          // narration audio
   const answerAudioRef = useRef(null);    // Q&A answer audio
   const narrationUrlRef = useRef(null);
-  const recRef = useRef(null);
+  const mediaRef = useRef(null);          // MediaRecorder
+  const streamRef = useRef(null);         // mic MediaStream
+  const chunksRef = useRef([]);           // recorded audio chunks
 
   function stopVoice() {
     if (audioRef.current) audioRef.current.pause();
@@ -54,7 +59,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
   // On arriving at a stop: reset, fetch the narration, and start speaking.
   useEffect(() => {
     stopVoice();
-    if (recRef.current) { try { recRef.current.abort(); } catch (e) {} }
+    stopRecording();
     setNarration(null);
     setLoadingNarration(true);
     setProgress(0);
@@ -63,6 +68,8 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
     setDraft("");
     setAsking(false);
     setListening(false);
+    setTranscribing(false);
+    setMicError("");
     narrationUrlRef.current = null;
     if (audioRef.current) audioRef.current.removeAttribute("src");
 
@@ -79,7 +86,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
       }
     })();
 
-    return () => { cancelled = true; stopVoice(); };
+    return () => { cancelled = true; stopVoice(); stopRecording(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
@@ -119,19 +126,53 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
     }
   }
 
-  function listen() {
-    if (listening) { try { recRef.current?.stop(); } catch (e) {} return; }
-    if (!SR) return; // no speech recognition - text box is the fallback
+  // Stop any in-progress recording and release the mic.
+  function stopRecording() {
+    try { if (mediaRef.current && mediaRef.current.state !== "inactive") mediaRef.current.stop(); } catch (e) {}
+    if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
+  }
+
+  // Record the mic, then transcribe server-side (ElevenLabs) and ask. Works in any
+  // browser that can record audio — the browser's own speech API is too unreliable.
+  async function listen() {
+    if (listening) { stopRecording(); return; }       // tap again = stop & send
+    if (asking || transcribing) return;
+    setMicError("");
+    if (!CAN_RECORD || !hasTts) {
+      setMicError("Voice questions aren't available here — type your question below.");
+      return;
+    }
     stopVoice(); // don't talk over the visitor
-    const rec = new SR();
-    recRef.current = rec;
-    rec.lang = "en-US";
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    rec.onresult = (e) => { const t = e.results[0][0].transcript; ask(t); };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    try { rec.start(); setListening(true); } catch (e) { setListening(false); }
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      setMicError("Microphone access was blocked. Allow it in your browser, or type below.");
+      return;
+    }
+    streamRef.current = stream;
+    chunksRef.current = [];
+    const mr = new MediaRecorder(stream);
+    mediaRef.current = mr;
+    mr.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
+    mr.onstop = async () => {
+      if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
+      setListening(false);
+      const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
+      if (!blob.size) return;
+      setTranscribing(true);
+      try {
+        const text = await transcribe(blob);
+        if (text) ask(text);
+        else setMicError("I didn't catch that. Try again, or type your question below.");
+      } catch (e) {
+        setMicError("Couldn't transcribe that. Try again, or type below.");
+      } finally {
+        setTranscribing(false);
+      }
+    };
+    try { mr.start(); setListening(true); }
+    catch (e) { setMicError("Couldn't start recording. Type your question below."); stopRecording(); }
   }
 
   const essay = loadingNarration ? "Composing this stop…" : (narration?.script || "");
@@ -197,10 +238,15 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
         <div className="ask">
           <p className="eyebrow">Ask the artist</p>
           <div className="ask-bar">
-            <button className={`mic ${listening ? "live" : ""}`} onClick={listen} disabled={asking}>
+            <button className={`mic ${listening ? "live" : ""}`} onClick={listen} disabled={asking || transcribing}>
               <span className="mic-dot" />
-              {listening ? "Listening - tap to stop" : (SR ? "Hold a question? Tap and speak" : "Ask a question below")}
+              {listening
+                ? "Listening - tap to stop"
+                : transcribing
+                ? "Transcribing…"
+                : (CAN_RECORD && hasTts ? "Tap and ask your question aloud" : "Ask a question below")}
             </button>
+            {micError && <p className="mic-error">{micError}</p>}
           </div>
           <div className="chips ask-suggestions">
             {SUGGESTED.map((q) => (

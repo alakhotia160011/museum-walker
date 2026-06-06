@@ -55,6 +55,18 @@ export async function askDocent({ stop, question, level, vibe, themes, eras, his
   return r.json();
 }
 
+// Transcribe a recorded question clip (Blob) to text via the server. Returns the text,
+// or "" if nothing was heard / STT is unavailable (caller falls back to typing).
+export async function transcribe(blob) {
+  const fd = new FormData();
+  const ext = (blob.type.includes("mp4") || blob.type.includes("mpeg")) ? "mp4" : "webm";
+  fd.append("audio", blob, `question.${ext}`);
+  const r = await fetch(`${BASE}/api/transcribe`, { method: "POST", body: fd });
+  if (!r.ok) return "";
+  const d = await r.json();
+  return d.text || "";
+}
+
 // Returns an object URL for the mp3, or null if the server has no TTS (use browser voice).
 // `voiceId` selects the artist-matched ElevenLabs voice (from the narrate response).
 export async function fetchAudioUrl(text, vibe, voiceId) {

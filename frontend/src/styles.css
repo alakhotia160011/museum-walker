@@ -355,6 +355,7 @@ h1, h2, h3 { font-family: var(--serif); font-optical-sizing: auto; font-weight: 
 .mic.live { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .mic.live .mic-dot { background: #e4002b; animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.5); } }
+.mic-error { margin: 10px 2px 0; font-size: 13px; color: #8a2b1c; }
 .ask-form { margin-top: 14px; }
 .ask-input::placeholder { color: var(--ink-3); }
 

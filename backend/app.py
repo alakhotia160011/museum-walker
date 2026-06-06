@@ -9,6 +9,7 @@ from flask_cors import CORS
 import curator
 import met_client
 import narrator
+import stt
 import tts
 import voices
 from config import HAS_CLAUDE, HAS_TTS
@@ -153,6 +154,17 @@ def ask():
         next_stop=body.get("nextStop"),
     )
     return jsonify({"answer": result["answer"], "source": result["source"]})
+
+
+@app.post("/api/transcribe")
+def transcribe():
+    """Transcribe a recorded question clip to text (ElevenLabs Scribe). The client
+    records the mic and posts the audio as multipart 'audio'. Returns {text, ok}."""
+    f = request.files.get("audio")
+    if f is None:
+        return jsonify({"error": "missing audio"}), 400
+    text = stt.transcribe(f.read(), f.filename or "question.webm", f.mimetype or "audio/webm")
+    return jsonify({"text": text or "", "ok": bool(text)})
 
 
 @app.post("/api/audio")
