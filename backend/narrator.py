@@ -100,7 +100,19 @@ def _fallback_script(stop: dict, themes: list[str]) -> str:
     )
 
 
-def generate_script(stop: dict, themes: list[str], level: str, vibe: str) -> dict:
+def _lang_note(language: str | None) -> str:
+    """Instruction appended to a prompt so Claude writes in the visitor's language.
+    Empty for English (the default)."""
+    lang = (language or "English").strip()
+    if not lang or lang.lower() == "english":
+        return ""
+    return (
+        f"Write your entire response in {lang} — natural, fluent {lang}, not a word-for-word "
+        f"translation. Keep any proper names (artist, place, the work's title) as they are. "
+    )
+
+
+def generate_script(stop: dict, themes: list[str], level: str, vibe: str, language: str = "English") -> dict:
     """Return {'script': str, 'estSeconds': int, 'source': 'claude'|'fallback'}."""
     if not HAS_CLAUDE:
         text = _fallback_script(stop, themes)
@@ -127,6 +139,7 @@ def generate_script(stop: dict, themes: list[str], level: str, vibe: str) -> dic
         f"- Subject tags: {tags}\n\n"
         f"If 'Maker (you)' is a named person, speak as them. If it is Unknown or a "
         f"culture/people/dynasty/workshop, speak as an unnamed maker of that culture and period. "
+        f"{_lang_note(language)}"
         f"Return only your spoken words."
     )
 
@@ -204,6 +217,7 @@ def answer_question(
     eras: list[str] | None = None,
     history: list[dict] | None = None,
     next_stop: dict | None = None,
+    language: str = "English",
 ) -> dict:
     """Answer a visitor's question about the current artwork in the artist's own (first-person)
     voice, tuned to the visitor's tastes (themes = type of art, eras = time periods).
@@ -249,7 +263,8 @@ def answer_question(
         f"{taste_line}"
         f"Tone: {persona}. Listener level: {level}. {level_note}{nxt}\n\n"
         f"If 'Maker (you)' is a named person, answer as them; if it is Unknown or a culture, "
-        f"answer as an unnamed maker of that culture. Answer the visitor's question in your own voice."
+        f"answer as an unnamed maker of that culture. {_lang_note(language)}"
+        f"Answer the visitor's question in your own voice."
     )
 
     messages = [{"role": "user", "content": context}]
@@ -305,7 +320,7 @@ def _intro_fallback(summary: dict) -> str:
     return f"Welcome. We'll begin with {title}, in {loc}.{rest}{scope} Let's step in."
 
 
-def route_intro(summary: dict, level: str, vibe: str, themes=None, eras=None) -> dict:
+def route_intro(summary: dict, level: str, vibe: str, themes=None, eras=None, language: str = "English") -> dict:
     """A short spoken welcome that orients the visitor before the first stop.
     `summary` = {start:{title,department,gallery,floor}, wings:[...], floors:[...],
     stopCount, estMinutes}. Returns {'intro': str, 'source': 'claude'|'fallback'}."""
@@ -328,6 +343,7 @@ def route_intro(summary: dict, level: str, vibe: str, themes=None, eras=None) ->
     )
     user_prompt = (
         f"Voice/persona: {persona}.\n"
+        f"{_lang_note(language)}"
         f"Write the opening welcome for this walk.\n\n{facts}"
     )
     try:
