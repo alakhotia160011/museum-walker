@@ -21,10 +21,12 @@ from config import DATA_DIR, MET_API_BASE
 
 POOL = DATA_DIR / "pool.json"
 WORKERS = 16
-SAVE_EVERY = 2000
+SAVE_EVERY = 1000
 
 _session = requests.Session()
 _session.headers.update({"User-Agent": "met-audio-guide/1.0"})
+_adapter = requests.adapters.HTTPAdapter(pool_connections=WORKERS, pool_maxsize=WORKERS)
+_session.mount("https://", _adapter)
 
 
 def fetch_image(obj: dict) -> dict:

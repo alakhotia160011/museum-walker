@@ -162,11 +162,13 @@ def _build_stop(
         "era": classify_era(obj.get("date")),
         "targetWords": words,
         "estSeconds": est_seconds,
-        # script is generated on demand (/api/narrate); image lazily (app.py);
+        # script is generated on demand (/api/narrate);
         # lat/lng/floor/floorId/building are attached by geo.order_route.
         "script": "",
-        "image": "",
-        "imageLarge": "",
+        # Use the baked image URL when the pool has one (no MET call needed);
+        # app.py live-hydrates only stops still missing it.
+        "image": obj.get("image", "") or "",
+        "imageLarge": obj.get("imageLarge", "") or "",
     }
 
 

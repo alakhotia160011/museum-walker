@@ -49,6 +49,8 @@ def itinerary():
     n, candidates = curator.select_candidates(minutes, themes, level, must_see, eras)
 
     def hydrate(stop):
+        if stop.get("image"):
+            return stop  # baked URL already present — no MET call
         obj = met_client.get_object(stop["objectID"])
         if obj:
             img = obj.get("primaryImageSmall") or obj.get("primaryImage") or ""
@@ -56,9 +58,10 @@ def itinerary():
             stop["imageLarge"] = obj.get("primaryImage") or img
         return stop
 
-    if candidates:
-        with ThreadPoolExecutor(max_workers=min(12, len(candidates))) as ex:
-            candidates = list(ex.map(hydrate, candidates))
+    need = [c for c in candidates if not c.get("image")]
+    if need:
+        with ThreadPoolExecutor(max_workers=min(12, len(need))) as ex:
+            list(ex.map(hydrate, need))
 
     imaged = [c for c in candidates if c.get("image")]
     keep = imaged[:n] if len(imaged) >= n else (imaged + [c for c in candidates if not c.get("image")])[:n]
