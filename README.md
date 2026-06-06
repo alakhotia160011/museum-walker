@@ -28,9 +28,11 @@ interactive Q&A layered on the player.
   [Living Map](https://maps.metmuseum.org) vector tiles. This places ~99% of on-view
   works on the real floor plan and is what makes location-aware routing possible.
 - **Curation** ([`curator.py`](backend/curator.py)) - time budget → number of stops;
-  score works by interest-theme tag overlap (+ highlights); **cluster into 1–3 adjacent
-  wings** by time so a tour doesn't crisscross the building; then hand the chosen works
-  to the route optimizer.
+  score works by interest-theme tag overlap **and historical-period (era) match**
+  (+ highlights); **cluster into 1–3 adjacent wings** by time so a tour doesn't crisscross
+  the building; then hand the chosen works to the route optimizer. Eras are parsed from each
+  object's free-form date string ([`eras.py`](backend/eras.py)) and steer both wing choice
+  and ranking, so picking "Ancient" actually pulls you toward Egyptian/Greek/Roman galleries.
 - **Route optimization** ([`geo.py`](backend/geo.py)) - orders the stops for the
   shortest, least-stair-heavy walk. See [Optimizing for location](#optimizing-for-location).
 - **Narration** ([`narrator.py`](backend/narrator.py)) - Claude writes a spoken script
@@ -135,6 +137,7 @@ backend/
   narrator.py      Claude narration scripts + "Ask the docent" Q&A (+ fallbacks)
   tts.py           ElevenLabs synthesis, content-hash cached
   themes.py        interest themes → Met tag keywords
+  eras.py          date-string parsing → historical-period buckets
   config.py        departments, timing, models, voice, per-tour wing budget
   seed_pool.py     build data/pool.json from the Open Access CSV
   seed_map.py      build data/gallery_coords.json from Living Map tiles

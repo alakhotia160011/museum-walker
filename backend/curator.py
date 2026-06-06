@@ -2,8 +2,8 @@
 
 Algorithm:
   1. per_stop = listen_minutes(level) + walk buffer  ->  N = floor(minutes / per_stop)
-  2. score every on-view object by theme overlap (+ highlight/image bonuses)
-  3. pick the best few departments (wings) for those themes, capped by time, so the
+  2. score every on-view object by theme overlap + era (period) match (+ highlight bonus)
+  3. pick the best few departments (wings) for those themes/eras, capped by time, so the
      route stays geographically tight instead of crisscrossing the whole museum
   4. inside those wings: force-include must-see highlights, then fill by score
   5. order by department + gallery number (proximity proxy), and attach a spoken
@@ -25,6 +25,7 @@ from config import (
     department_budget,
 )
 from themes import score_themes
+from eras import classify_era, score_eras
 import geo
 
 _POOL: list[dict] | None = None
@@ -57,23 +58,26 @@ def num_stops(minutes: int, level: str) -> int:
     return max(1, int(minutes // per_stop))
 
 
-def _score(obj: dict, themes: list[str]) -> float:
+def _score(obj: dict, themes: list[str], eras: list[str]) -> float:
     s = float(score_themes(obj, themes)) * 3.0
+    s += float(score_eras(obj, eras)) * 3.0
     if obj.get("isHighlight"):
         s += 2.0
     return s
 
 
-def _pick_departments(pool: list[dict], themes: list[str], max_depts: int) -> set[int]:
-    """Rank wings by how well they fit the chosen themes (falling back to highlight
-    density when no themes are selected) and keep the top `max_depts`."""
+def _pick_departments(
+    pool: list[dict], themes: list[str], eras: list[str], max_depts: int
+) -> set[int]:
+    """Rank wings by how well they fit the chosen themes/eras (falling back to highlight
+    density when nothing is selected) and keep the top `max_depts`."""
     weight: dict[int, float] = defaultdict(float)
     for obj in pool:
         d = obj.get("departmentId")
         if d is None:
             continue
-        if themes:
-            weight[d] += float(score_themes(obj, themes))
+        if themes or eras:
+            weight[d] += float(score_themes(obj, themes)) + float(score_eras(obj, eras))
         elif obj.get("isHighlight"):
             weight[d] += 1.0
     ranked = [d for d, w in sorted(weight.items(), key=lambda kv: -kv[1]) if w > 0]
@@ -136,7 +140,9 @@ def transition_line(current: dict, nxt: dict | None) -> str:
 _IMAGE_BUFFER = 14
 
 
-def _build_stop(obj: dict, themes: list[str], words: int, est_seconds: int) -> dict:
+def _build_stop(
+    obj: dict, themes: list[str], eras: list[str], words: int, est_seconds: int
+) -> dict:
     return {
         "stopId": f"{obj['objectID']}",
         "objectID": obj["objectID"],
@@ -151,6 +157,8 @@ def _build_stop(obj: dict, themes: list[str], words: int, est_seconds: int) -> d
         "isHighlight": obj.get("isHighlight", False),
         "tags": obj.get("tags", []),
         "themeMatch": score_themes(obj, themes),
+        "eraMatch": score_eras(obj, eras),
+        "era": classify_era(obj.get("date")),
         "targetWords": words,
         "estSeconds": est_seconds,
         # script is generated on demand (/api/narrate); image lazily (app.py);
@@ -161,25 +169,30 @@ def _build_stop(obj: dict, themes: list[str], words: int, est_seconds: int) -> d
     }
 
 
-def select_candidates(minutes: int, themes: list[str], level: str, must_see: bool):
+def select_candidates(
+    minutes: int, themes: list[str], level: str, must_see: bool, eras: list[str] | None = None
+):
     """Pick the works for a tour. Returns (n, candidates) where `candidates` is a ranked
     list of up to n + buffer stop dicts (unordered, no narration) so the caller can drop
     imageless works and still assemble n imaged stops."""
+    eras = eras or []
     pool = load_pool()
     if not pool:
         return 0, []
 
     n = min(num_stops(minutes, level), len(pool))
-    allowed = _pick_departments(pool, themes, department_budget(minutes))
+    allowed = _pick_departments(pool, themes, eras, department_budget(minutes))
     candidates = [o for o in pool if o.get("departmentId") in allowed] or pool
     cap = min(len(candidates), n + _IMAGE_BUFFER)
 
-    ranked = sorted(candidates, key=lambda o: _score(o, themes), reverse=True)
+    ranked = sorted(candidates, key=lambda o: _score(o, themes, eras), reverse=True)
     chosen: list[dict] = []
     chosen_ids: set[int] = set()
 
     if must_see:
-        for obj in sorted(candidates, key=lambda o: (not o.get("isHighlight"), -_score(o, themes))):
+        for obj in sorted(
+            candidates, key=lambda o: (not o.get("isHighlight"), -_score(o, themes, eras))
+        ):
             if len(chosen) >= cap or not obj.get("isHighlight"):
                 break
             if obj["objectID"] not in chosen_ids:
@@ -195,7 +208,7 @@ def select_candidates(minutes: int, themes: list[str], level: str, must_see: boo
 
     words = target_words(level)
     est = int(words / WORDS_PER_MINUTE * 60)
-    return n, [_build_stop(o, themes, words, est) for o in chosen]
+    return n, [_build_stop(o, themes, eras, words, est) for o in chosen]
 
 
 def finalize(stops: list[dict]) -> list[dict]:
@@ -208,9 +221,11 @@ def finalize(stops: list[dict]) -> list[dict]:
     return stops
 
 
-def build_itinerary(minutes: int, themes: list[str], level: str, must_see: bool) -> list[dict]:
+def build_itinerary(
+    minutes: int, themes: list[str], level: str, must_see: bool, eras: list[str] | None = None
+) -> list[dict]:
     """Convenience for offline use/tests: select n works and finalize the route
     (no image filtering, no narration). The API hydrates images and narration separately."""
-    n, candidates = select_candidates(minutes, themes, level, must_see)
+    n, candidates = select_candidates(minutes, themes, level, must_see, eras)
     stops = finalize(candidates[:n])
     return stops

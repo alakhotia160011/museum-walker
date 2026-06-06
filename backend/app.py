@@ -46,7 +46,7 @@ def itinerary():
     # Pick more candidates than we need, then drop any without an image so the tour is
     # never padded with "image unavailable" plates. Narration is NOT generated here - it's
     # produced per stop on demand (/api/narrate) so the route appears fast.
-    n, candidates = curator.select_candidates(minutes, themes, level, must_see)
+    n, candidates = curator.select_candidates(minutes, themes, level, must_see, eras)
 
     def hydrate(stop):
         obj = met_client.get_object(stop["objectID"])
