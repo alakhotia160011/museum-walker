@@ -363,22 +363,10 @@ h1, h2, h3 { font-family: var(--serif); font-optical-sizing: auto; font-weight: 
 .stopnav .t { font-family: var(--serif); font-size: 15px; color: var(--ink); margin-top: 4px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stopnav .next { text-align: right; margin-left: auto; }
 
-/* ---------- wide: editorial two-column stop ---------- */
+/* ---------- wide: keep the stop a single centered reading column ----------
+   (a two-column layout let the tall plate overflow and overlap the controls). */
 @media (min-width: 880px) {
-  .stop {
-    grid-template-columns: minmax(0, 46%) minmax(0, 1fr);
-    column-gap: clamp(32px, 5vw, 64px);
-    grid-template-areas:
-      "head  head"
-      "wall  wall"
-      "plate essay"
-      "player essay"
-      "onward onward"
-      "ask    ask"
-      "nav    nav";
-    align-items: start;
-  }
-  .plate { position: sticky; top: 32px; }
+  .stop { max-width: 720px; margin-inline: auto; }
 }
 
 /* ---------- motion: staggered fade-up on screen load ---------- */
