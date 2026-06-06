@@ -4,95 +4,115 @@ const TIMES = [20, 45, 90];
 const LEVELS = ["Casual", "Enthusiast", "Expert"];
 const VIBES = ["Storyteller", "Art historian", "Quick hits", "Kid-friendly"];
 
-export default function Onboarding({ themes, onStart, loading, error }) {
+// mirrors curator.py timing so the visitor sees a derived stop count
+const LISTEN = { Casual: 1.5, Enthusiast: 2.5, Expert: 3.5 };
+const BUFFER = 1.5;
+const derivedStops = (minutes, level) =>
+  Math.max(1, Math.floor(minutes / (LISTEN[level] + BUFFER)));
+
+export default function Compose({ themes, onCompose, error }) {
   const [minutes, setMinutes] = useState(45);
   const [selected, setSelected] = useState([]);
   const [level, setLevel] = useState("Casual");
   const [vibe, setVibe] = useState("Storyteller");
   const [mustSee, setMustSee] = useState(true);
 
-  function toggleTheme(id) {
+  const toggleTheme = (id) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
-  }
+
+  const Chip = ({ on, onClick, children, title }) => (
+    <button type="button" className="chip" aria-pressed={on} onClick={onClick} title={title}>
+      {children}
+    </button>
+  );
 
   return (
-    <div className="screen onboarding">
-      <header className="hero">
-        <p className="kicker">The Met · Personalized Audio Guide</p>
-        <h1>How do you want to experience the museum today?</h1>
-        <p className="sub">Tell us your time and your taste. We'll craft a path just for you.</p>
-      </header>
+    <div className="screen">
+      <div className="page stagger">
+        <header className="masthead">
+          <p className="eyebrow">The Metropolitan Museum of Art</p>
+          <h1 className="wordmark">Docent</h1>
+          <hr className="rule" />
+          <p className="colophon">
+            A self-guided audio walk. Tell me two things and I'll compose a route worth
+            your time. Artwork and collection data are public domain, courtesy of the{" "}
+            <a href="https://metmuseum.github.io/" target="_blank" rel="noreferrer">
+              Met Collection API
+            </a>.
+          </p>
+        </header>
 
-      <section className="block">
-        <h2>I have…</h2>
-        <div className="pills">
-          {TIMES.map((t) => (
-            <button
-              key={t}
-              className={`pill ${minutes === t ? "on" : ""}`}
-              onClick={() => setMinutes(t)}
-            >
-              {t} min
-            </button>
-          ))}
-        </div>
-      </section>
+        <p className="lede serif">Compose your visit.</p>
 
-      <section className="block">
-        <h2>I'm interested in…</h2>
-        <div className="chips">
-          {themes.map((t) => (
-            <button
-              key={t.id}
-              className={`chip ${selected.includes(t.id) ? "on" : ""}`}
-              onClick={() => toggleTheme(t.id)}
-              title={t.blurb}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="block two">
-        <div>
-          <h2>My level</h2>
-          <div className="pills">
-            {LEVELS.map((l) => (
-              <button key={l} className={`pill ${level === l ? "on" : ""}`} onClick={() => setLevel(l)}>
-                {l}
-              </button>
+        <section className="section">
+          <div className="section-head">
+            <span className="numeral">I</span>
+            <span className="label">How long you have</span>
+            <span className="aside num">about {derivedStops(minutes, level)} stops</span>
+          </div>
+          <div className="chips">
+            {TIMES.map((t) => (
+              <Chip key={t} on={minutes === t} onClick={() => setMinutes(t)}>
+                <span className="num">{t}</span> minutes
+              </Chip>
             ))}
           </div>
-        </div>
-        <div>
-          <h2>Narration vibe</h2>
-          <div className="pills">
-            {VIBES.map((v) => (
-              <button key={v} className={`pill ${vibe === v ? "on" : ""}`} onClick={() => setVibe(v)}>
-                {v}
-              </button>
+        </section>
+
+        <section className="section">
+          <div className="section-head">
+            <span className="numeral">II</span>
+            <span className="label">What you care about</span>
+            <span className="aside">{selected.length ? `${selected.length} chosen` : "optional"}</span>
+          </div>
+          <div className="chips">
+            {themes.map((t) => (
+              <Chip key={t.id} on={selected.includes(t.id)} onClick={() => toggleTheme(t.id)} title={t.blurb}>
+                {t.label}
+              </Chip>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="block">
-        <label className="toggle">
-          <input type="checkbox" checked={mustSee} onChange={(e) => setMustSee(e.target.checked)} />
-          <span>Always include must-see highlights</span>
-        </label>
-      </section>
+        <section className="section">
+          <div className="section-head">
+            <span className="numeral">III</span>
+            <span className="label">The voice</span>
+          </div>
+          <div className="field-group">
+            <p className="field-label">How much you already know</p>
+            <div className="chips">
+              {LEVELS.map((l) => (
+                <Chip key={l} on={level === l} onClick={() => setLevel(l)}>{l}</Chip>
+              ))}
+            </div>
+          </div>
+          <div className="field-group">
+            <p className="field-label">The tone of the narration</p>
+            <div className="chips">
+              {VIBES.map((v) => (
+                <Chip key={v} on={vibe === v} onClick={() => setVibe(v)}>{v}</Chip>
+              ))}
+            </div>
+          </div>
 
-      {error && <p className="error">{error}</p>}
+          <label className="toggle">
+            <input type="checkbox" checked={mustSee} onChange={(e) => setMustSee(e.target.checked)} />
+            <span>Include the museum's signature works</span>
+          </label>
+        </section>
 
-      <button
-        className="cta"
-        disabled={loading}
-        onClick={() => onStart({ minutes, themes: selected, level, vibe, mustSee })}
-      >
-        {loading ? "Crafting your path…" : "Build my tour →"}
-      </button>
+        {error && <p className="error">{error}</p>}
+      </div>
+
+      <div className="actionbar">
+        <button
+          className="cta"
+          onClick={() => onCompose({ minutes, themes: selected, level, vibe, mustSee })}
+        >
+          Compose the route <span className="arrow">→</span>
+        </button>
+      </div>
     </div>
   );
 }

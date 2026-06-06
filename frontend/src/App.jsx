@@ -1,62 +1,65 @@
 import { useEffect, useState } from "react";
 import { getConfig, getThemes, buildItinerary } from "./api.js";
-import Onboarding from "./components/Onboarding.jsx";
-import Itinerary from "./components/Itinerary.jsx";
-import Player from "./components/Player.jsx";
+import Compose from "./components/Onboarding.jsx";
+import Curating from "./components/Curating.jsx";
+import Route from "./components/Itinerary.jsx";
+import Stop from "./components/Player.jsx";
 
 export default function App() {
-  const [screen, setScreen] = useState("onboarding"); // onboarding | itinerary | player
-  const [config, setConfig] = useState({ hasTts: false });
+  const [screen, setScreen] = useState("compose"); // compose | curating | route | stop
+  const [config, setConfig] = useState({ hasTts: false, hasClaude: false });
   const [themes, setThemes] = useState([]);
   const [tour, setTour] = useState(null);
   const [activeStop, setActiveStop] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     getConfig().then(setConfig).catch(() => {});
-    getThemes().then(setThemes).catch(() => setError("Could not load themes"));
+    getThemes().then(setThemes).catch(() => setError("The themes couldn't be loaded."));
   }, []);
 
-  async function start(prefs) {
-    setLoading(true);
+  async function compose(prefs) {
     setError("");
+    setScreen("curating");
+    const started = Date.now();
     try {
       const result = await buildItinerary(prefs);
+      // let the curating transition breathe even when the route returns instantly
+      const elapsed = Date.now() - started;
+      if (elapsed < 1500) await new Promise((r) => setTimeout(r, 1500 - elapsed));
       setTour(result);
-      setScreen("itinerary");
+      setActiveStop(0);
+      setScreen("route");
     } catch (e) {
-      setError("Couldn't build your tour. Is the backend running?");
-    } finally {
-      setLoading(false);
+      setError("The route couldn't be composed. Is the backend running?");
+      setScreen("compose");
     }
   }
 
   function openStop(i) {
     setActiveStop(i);
-    setScreen("player");
+    setScreen("stop");
+    window.scrollTo(0, 0);
   }
 
   return (
     <div className="app">
-      {screen === "onboarding" && (
-        <Onboarding themes={themes} onStart={start} loading={loading} error={error} />
+      {screen === "compose" && (
+        <Compose themes={themes} onCompose={compose} error={error} />
       )}
-      {screen === "itinerary" && tour && (
-        <Itinerary
-          tour={tour}
-          onOpen={openStop}
-          onRestart={() => setScreen("onboarding")}
-        />
+      {screen === "curating" && <Curating />}
+      {screen === "route" && tour && (
+        <Route tour={tour} onOpen={openStop} onRestart={() => setScreen("compose")} />
       )}
-      {screen === "player" && tour && (
-        <Player
+      {screen === "stop" && tour && (
+        <Stop
           stops={tour.stops}
           index={activeStop}
-          setIndex={setActiveStop}
+          setIndex={(i) => { setActiveStop(i); window.scrollTo(0, 0); }}
           hasTts={tour.meta?.hasTts}
+          hasClaude={config.hasClaude}
           vibe={tour.meta?.vibe}
-          onBack={() => setScreen("itinerary")}
+          onBack={() => setScreen("route")}
         />
       )}
     </div>
