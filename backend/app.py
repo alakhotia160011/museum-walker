@@ -185,6 +185,40 @@ def transcribe():
     return jsonify({"text": text or "", "ok": bool(text)})
 
 
+@app.get("/api/debug/voices")
+def debug_voices():
+    """Temporary: paginate ALL Cartesia voices and report country/language coverage."""
+    import requests as _rq
+    from collections import Counter
+    from config import CARTESIA_API_KEY, CARTESIA_VERSION
+    hdr = {"Authorization": f"Bearer {CARTESIA_API_KEY}", "Cartesia-Version": CARTESIA_VERSION}
+    items, after, pages = [], None, 0
+    try:
+        while pages < 15:
+            params = {"limit": 100}
+            if after:
+                params["starting_after"] = after
+            r = _rq.get("https://api.cartesia.ai/voices", headers=hdr, params=params, timeout=20)
+            j = r.json()
+            page = j.get("data", []) if isinstance(j, dict) else (j if isinstance(j, list) else [])
+            items += page
+            pages += 1
+            if not (isinstance(j, dict) and j.get("has_more") and page):
+                break
+            after = page[-1].get("id")
+            if not after:
+                break
+    except Exception as e:
+        return jsonify({"error": str(e), "got": len(items)}), 500
+    return jsonify({
+        "pages": pages,
+        "total": len(items),
+        "country_hist": dict(Counter((v.get("country") or "?") for v in items)),
+        "lang_hist": dict(Counter((v.get("language") or "?") for v in items)),
+        "lang_country_pairs": dict(Counter(f"{(v.get('language') or '?')}/{(v.get('country') or '?')}" for v in items)),
+    })
+
+
 @app.post("/api/audio")
 def audio():
     """Synthesize (or serve cached) speech for a script. Stateless: the client posts
