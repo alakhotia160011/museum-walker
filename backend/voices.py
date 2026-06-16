@@ -37,26 +37,36 @@ REGION_ACCENT = {
     "north_american":  ["US", "CA", "GB"],
     "british":         ["GB", "IE", "US"],
     "irish":           ["IE", "GB", "US"],
-    "australian":      ["AU", "GB", "US"],
+    "australian":      ["AU", "NZ", "GB", "US"],
     "french":          ["FR", "GB", "US"],
     "italian":         ["IT", "GB", "US"],
-    "iberian":         ["ES", "PT", "GB", "US"],
+    "iberian":         ["ES", "PT", "MX", "GB", "US"],
     "greek":           ["GR", "IT", "GB", "US"],
-    "mediterranean":   ["IT", "GR", "GB", "US"],
-    "german":          ["DE", "GB", "US"],
-    "dutch":           ["NL", "GB", "US"],
-    "nordic":          ["SE", "NO", "DK", "GB", "US"],
-    "slavic":          ["RU", "PL", "GB", "US"],
-    "middle_eastern":  ["GB", "US"],
-    "north_african":   ["GB", "US"],
-    "african":         ["US", "GB"],
-    "east_asian":      ["US", "GB"],
+    "mediterranean":   ["IT", "GR", "ES", "GB", "US"],
+    "german":          ["DE", "CH", "NL", "GB", "US"],
+    "dutch":           ["NL", "DE", "GB", "US"],
+    "nordic":          ["SE", "NO", "DK", "FI", "GB", "US"],
+    "slavic":          ["RU", "PL", "UA", "CZ", "SK", "GB", "US"],
+    "middle_eastern":  ["SA", "TR", "IL", "GB", "US"],
+    "north_african":   ["SA", "GB", "US"],
+    "african":         ["ZA", "US", "GB"],
+    "east_asian":      ["JP", "KR", "CN", "US", "GB"],
     "south_asian":     ["IN", "GB", "US"],
-    "southeast_asian": ["US", "GB"],
-    "latin_american":  ["ES", "US", "GB"],
+    "southeast_asian": ["TH", "VN", "ID", "PH", "SG", "US", "GB"],
+    "latin_american":  ["MX", "BR", "CO", "BO", "ES", "US"],
     "neutral":         ["US", "GB"],
 }
 REGIONS = list(REGION_ACCENT.keys())
+
+# For voices missing a `country` tag, infer the accent country from the voice's language.
+LANG2COUNTRY = {
+    "de": "DE", "fr": "FR", "it": "IT", "es": "ES", "ja": "JP", "ko": "KR", "zh": "CN",
+    "hi": "IN", "ru": "RU", "pt": "PT", "nl": "NL", "sv": "SE", "tr": "TR", "th": "TH",
+    "vi": "VN", "pl": "PL", "he": "IL", "el": "GR", "ar": "SA", "cs": "CZ", "da": "DK",
+    "fi": "FI", "hu": "HU", "id": "ID", "uk": "UA", "no": "NO", "ms": "MY", "ro": "RO",
+    "hr": "HR", "sk": "SK", "ka": "GE", "bn": "BD", "ta": "IN", "te": "IN", "ml": "IN",
+    "kn": "IN", "mr": "IN", "pa": "IN", "gu": "IN",
+}
 
 # Culture / nationality / place keywords -> region token, for the heuristic (anonymous and
 # cultural makers, and the no-Claude fallback). Checked against artist + department text.
@@ -120,32 +130,47 @@ def _norm_gender(g: str | None) -> str:
     return "unknown"
 
 
+def _accent_of(v: dict) -> str:
+    """The accent country for a voice: its `country`, else inferred from its language
+    (Cartesia voices are cross-lingual, so an Italian voice carries an Italian accent
+    even when speaking English)."""
+    c = (v.get("country") or "").upper()
+    if c:
+        return c
+    return LANG2COUNTRY.get((v.get("language") or "").lower(), "")
+
+
 def _load_voices() -> list[dict]:
-    """English Cartesia voices as [{id, gender, country}], fetched once and cached.
-    Empty if TTS is unconfigured or /voices can't be reached."""
+    """The whole Cartesia voice library as [{id, gender, accent}], paginated and cached.
+    Not filtered by language — accent comes from `country` (or language), and any voice
+    can speak the narration language. Empty if TTS is unconfigured or /voices fails."""
     global _VOICES
     if _VOICES is not None:
         return _VOICES
     _VOICES = []
     if not HAS_TTS:
         return _VOICES
+    hdr = {"Authorization": f"Bearer {CARTESIA_API_KEY}", "Cartesia-Version": CARTESIA_VERSION}
+    after, pages = None, 0
     try:
-        r = requests.get(
-            "https://api.cartesia.ai/voices",
-            headers={"Authorization": f"Bearer {CARTESIA_API_KEY}", "Cartesia-Version": CARTESIA_VERSION},
-            params={"limit": 100},
-            timeout=20,
-        )
-        r.raise_for_status()
-        j = r.json()
-        items = j["data"] if isinstance(j, dict) and "data" in j else (j if isinstance(j, list) else [])
-        for v in items:
-            if (v.get("language") or "").lower() != "en":
-                continue
-            vid = v.get("id")
-            if vid:
-                _VOICES.append({"id": vid, "gender": _norm_gender(v.get("gender")),
-                                "country": (v.get("country") or "").upper()})
+        while pages < 12:
+            params = {"limit": 100}
+            if after:
+                params["starting_after"] = after
+            r = requests.get("https://api.cartesia.ai/voices", headers=hdr, params=params, timeout=20)
+            r.raise_for_status()
+            j = r.json()
+            page = j["data"] if isinstance(j, dict) and "data" in j else (j if isinstance(j, list) else [])
+            for v in page:
+                vid = v.get("id")
+                if vid:
+                    _VOICES.append({"id": vid, "gender": _norm_gender(v.get("gender")), "accent": _accent_of(v)})
+            pages += 1
+            if not (isinstance(j, dict) and j.get("has_more") and page):
+                break
+            after = page[-1].get("id")
+            if not after:
+                break
     except requests.RequestException as e:
         print(f"[voices] could not list Cartesia voices ({e})")
     return _VOICES
@@ -157,7 +182,10 @@ def default_voice_id() -> str:
         return CARTESIA_VOICE_ID
     vs = _load_voices()
     for v in vs:
-        if v["gender"] == "female" and v["country"] == "US":
+        if v["gender"] == "female" and v["accent"] == "US":
+            return v["id"]
+    for v in vs:
+        if v["accent"] == "US":
             return v["id"]
     return vs[0]["id"] if vs else ""
 
@@ -259,8 +287,8 @@ def select_voice(profile: dict, seed: str = "") -> str:
         if gender in ("male", "female") and v["gender"] not in (gender, "unknown"):
             continue  # don't give a male artist a clearly-female voice
         score = 0
-        if v["country"] in prefs:
-            score += (len(prefs) - prefs.index(v["country"])) * 2  # earlier pref = higher
+        if v["accent"] in prefs:
+            score += (len(prefs) - prefs.index(v["accent"])) * 2  # earlier pref = higher
         if gender in ("male", "female") and v["gender"] == gender:
             score += 1  # prefer an exact gender match over an unknown-gender voice
         scored.append((score, v))

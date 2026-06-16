@@ -219,6 +219,18 @@ def debug_voices():
     })
 
 
+@app.get("/api/debug/match")
+def debug_match():
+    """Temporary: show the matched voice + accent for an artist/department."""
+    stop = {"artist": request.args.get("artist", ""), "department": request.args.get("dept", ""),
+            "title": "x", "date": request.args.get("date", "")}
+    prof = voices.infer_profile(stop)
+    vid = voices.voice_for_stop(stop)
+    acc = next((v["accent"] for v in voices._load_voices() if v["id"] == vid), "?")
+    return jsonify({"region": prof.get("region"), "gender": prof.get("gender"),
+                    "voiceId": vid, "accent": acc, "library_size": len(voices._load_voices())})
+
+
 @app.post("/api/audio")
 def audio():
     """Synthesize (or serve cached) speech for a script. Stateless: the client posts
