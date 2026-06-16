@@ -15,6 +15,7 @@ Image URLs are NOT stored in the pool; they're hydrated lazily for the chosen st
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 
 from config import (
@@ -38,6 +39,52 @@ def load_pool() -> list[dict]:
         path = DATA_DIR / "pool.json"
         _POOL = json.loads(path.read_text()) if path.exists() else []
     return _POOL
+
+
+# CJK / Kana / Hangul / fullwidth blocks — the Met keeps some Asian titles in the original
+# script (sometimes as "<original>|<English>", sometimes with the script inline) and a few
+# works are flatly "Untitled". We show a readable English title so the visitor never hears
+# or reads raw characters their device may not even render.
+_CJK = re.compile(
+    r"[　-〿぀-ヿㇰ-ㇿ㐀-䶿一-鿿"
+    r"豈-﫿가-힯＀-￯]"
+)
+_HAS_LATIN = re.compile(r"[A-Za-z]")
+
+
+def _display_title(obj: dict) -> str:
+    """A clean, speakable English title: prefer the English side of an '<original>|English'
+    pair, strip any inline original-script characters, and fall back to the work's
+    classification (then medium) when nothing readable remains or it's 'Untitled'."""
+    t = (obj.get("title") or "").strip()
+    if "|" in t:  # "<original script>|<English>" — keep the English (last Latin segment)
+        latin = [p.strip() for p in t.split("|") if _HAS_LATIN.search(p)]
+        if latin:
+            t = latin[-1]
+    if _CJK.search(t):  # strip inline original-script characters and tidy the leftovers
+        t = _CJK.sub("", t)
+        t = re.sub(r"\(\s*\)", "", t)        # emptied parentheses
+        t = re.sub(r"\s{2,}", " ", t)
+        t = t.strip(" -–—|·,")
+    if not _HAS_LATIN.search(t) or t.lower().startswith("untitled"):
+        cls = (obj.get("classification") or "").strip()
+        medium = (obj.get("medium") or "").strip()
+        base = cls or (medium.split(",")[0].strip() if medium else "") or "Work"
+        place = _origin_place(obj)
+        t = f"{base} from {place}" if place else base
+    return t
+
+
+def _origin_place(obj: dict) -> str:
+    """A short place name (the first segment of culture/country/nationality), for naming
+    works the Met left 'Untitled' — e.g. 'India, Tamil Nadu' -> 'India'."""
+    for field in ("culture", "country", "artistNationality"):
+        v = (obj.get(field) or "").strip()
+        if v:
+            v = re.split(r"[,(|]", v)[0].strip()
+            if v:
+                return v
+    return ""
 
 
 def _gallery_num(obj: dict) -> int:
@@ -154,7 +201,7 @@ def _build_stop(
     return {
         "stopId": f"{obj['objectID']}",
         "objectID": obj["objectID"],
-        "title": obj["title"],
+        "title": _display_title(obj),
         "artist": obj["artist"],
         "date": obj["date"],
         "medium": obj["medium"],
