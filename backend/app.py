@@ -53,13 +53,14 @@ def itinerary():
     level = body.get("level", "Casual")
     vibe = body.get("vibe", "Storyteller")
     eras = body.get("eras") or []
+    regions = body.get("regions") or body.get("countries") or []
     language = body.get("language", "English")
     must_see = bool(body.get("mustSee", True))
 
     # Pick more candidates than we need, then drop any without an image so the tour is
     # never padded with "image unavailable" plates. Narration is NOT generated here - it's
     # produced per stop on demand (/api/narrate) so the route appears fast.
-    n, candidates = curator.select_candidates(minutes, themes, level, must_see, eras)
+    n, candidates = curator.select_candidates(minutes, themes, level, must_see, eras, regions)
 
     def hydrate(stop):
         if stop.get("image"):
@@ -92,6 +93,7 @@ def itinerary():
                 "level": level,
                 "vibe": vibe,
                 "eras": eras,
+                "regions": regions,
                 "language": language,
                 "mustSee": must_see,
                 "stopCount": len(stops),

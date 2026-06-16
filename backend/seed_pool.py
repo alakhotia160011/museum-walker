@@ -97,6 +97,10 @@ def _slim(row: dict) -> dict:
         "metUrl": (row.get("Link Resource") or "").strip(),
         "tags": tags[:12],
         "classification": (row.get("Classification") or "").strip(),
+        # Country/culture signals for the "where it's from" filter.
+        "culture": _clean(row.get("Culture")),
+        "country": (row.get("Country") or "").strip(),
+        "artistNationality": _clean(row.get("Artist Nationality")),
     }
 
 

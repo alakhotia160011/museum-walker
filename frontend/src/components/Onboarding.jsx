@@ -4,6 +4,18 @@ const TIMES = [20, 45, 90];
 const LEVELS = ["Casual", "Enthusiast", "Expert"];
 const VIBES = ["Storyteller", "Art historian", "Quick hits", "Kid-friendly"];
 const ERAS = ["Ancient", "Medieval", "Renaissance", "Baroque", "18th–19th c.", "Modern"];
+// mirrors region_list() in backend/countries.py — ids must stay in sync
+const REGIONS = [
+  { id: "north_america", label: "North America" },
+  { id: "europe", label: "Europe" },
+  { id: "classical", label: "Greece & Rome" },
+  { id: "egypt", label: "Egypt" },
+  { id: "middle_east", label: "Middle East & Persia" },
+  { id: "east_asia", label: "East Asia" },
+  { id: "south_se_asia", label: "South & SE Asia" },
+  { id: "africa", label: "Africa" },
+  { id: "americas", label: "Latin America" },
+];
 const LANGUAGES = ["English", "Spanish", "French", "German", "Italian", "Mandarin", "Japanese", "Hindi"];
 
 // mirrors curator.py timing so the visitor sees a derived stop count
@@ -18,6 +30,7 @@ export default function Compose({ themes, onCompose, error }) {
   const [level, setLevel] = useState("Casual");
   const [vibe, setVibe] = useState("Storyteller");
   const [eras, setEras] = useState([]);
+  const [regions, setRegions] = useState([]);
   const [language, setLanguage] = useState("English");
   const [mustSee, setMustSee] = useState(true);
 
@@ -25,6 +38,8 @@ export default function Compose({ themes, onCompose, error }) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const toggleEra = (e) =>
     setEras((s) => (s.includes(e) ? s.filter((x) => x !== e) : [...s, e]));
+  const toggleRegion = (id) =>
+    setRegions((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
   const Chip = ({ on, onClick, children, title }) => (
     <button type="button" className="chip" aria-pressed={on} onClick={onClick} title={title}>
@@ -88,6 +103,14 @@ export default function Compose({ themes, onCompose, error }) {
               ))}
             </div>
           </div>
+          <div className="field-group">
+            <p className="field-label">Where it's from</p>
+            <div className="chips">
+              {REGIONS.map((r) => (
+                <Chip key={r.id} on={regions.includes(r.id)} onClick={() => toggleRegion(r.id)}>{r.label}</Chip>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="section">
@@ -135,7 +158,7 @@ export default function Compose({ themes, onCompose, error }) {
       <div className="actionbar">
         <button
           className="cta"
-          onClick={() => onCompose({ minutes, themes: selected, level, vibe, eras, language, mustSee })}
+          onClick={() => onCompose({ minutes, themes: selected, level, vibe, eras, regions, language, mustSee })}
         >
           Compose the route <span className="arrow">→</span>
         </button>

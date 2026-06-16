@@ -25,7 +25,7 @@ from config import (
     CARTESIA_API_KEY,
     CARTESIA_VERSION,
     CARTESIA_VOICE_ID,
-    CLAUDE_MODEL,
+    CLAUDE_FAST_MODEL,
     HAS_CLAUDE,
     HAS_TTS,
 )
@@ -230,7 +230,7 @@ def _infer_profile_claude(stop: dict) -> dict | None:
     from narrator import _get_client
 
     resp = _get_client().messages.create(
-        model=CLAUDE_MODEL,
+        model=CLAUDE_FAST_MODEL,
         max_tokens=120,
         system=[{"type": "text", "text": system}],
         messages=[{"role": "user", "content": user}],

@@ -26,6 +26,7 @@ from config import (
 )
 from themes import score_themes
 from eras import classify_era, score_eras
+import countries
 import geo
 
 _POOL: list[dict] | None = None
@@ -58,26 +59,32 @@ def num_stops(minutes: int, level: str) -> int:
     return max(1, int(minutes // per_stop))
 
 
-def _score(obj: dict, themes: list[str], eras: list[str]) -> float:
+def _score(obj: dict, themes: list[str], eras: list[str], regions: list[str]) -> float:
     s = float(score_themes(obj, themes)) * 3.0
     s += float(score_eras(obj, eras)) * 3.0
+    s += float(countries.score_regions(obj, regions)) * 3.0
     if obj.get("isHighlight"):
         s += 2.0
     return s
 
 
 def _pick_departments(
-    pool: list[dict], themes: list[str], eras: list[str], max_depts: int
+    pool: list[dict], themes: list[str], eras: list[str], regions: list[str], max_depts: int
 ) -> set[int]:
-    """Rank wings by how well they fit the chosen themes/eras (falling back to highlight
-    density when nothing is selected) and keep the top `max_depts`."""
+    """Rank wings by how well they fit the chosen themes/eras/regions (falling back to
+    highlight density when nothing is selected) and keep the top `max_depts`. Operates on
+    the *already era/region-filtered* pool, so it picks the wings densest in matches."""
     weight: dict[int, float] = defaultdict(float)
     for obj in pool:
         d = obj.get("departmentId")
         if d is None:
             continue
-        if themes or eras:
-            weight[d] += float(score_themes(obj, themes)) + float(score_eras(obj, eras))
+        if themes or eras or regions:
+            weight[d] += (
+                float(score_themes(obj, themes))
+                + float(score_eras(obj, eras))
+                + float(countries.score_regions(obj, regions))
+            )
         elif obj.get("isHighlight"):
             weight[d] += 1.0
     ranked = [d for d, w in sorted(weight.items(), key=lambda kv: -kv[1]) if w > 0]
@@ -172,30 +179,61 @@ def _build_stop(
     }
 
 
+def _filter_pool(pool: list[dict], eras: list[str], regions: list[str]) -> list[dict]:
+    """Apply era + region as HARD filters: every kept work is from a selected period AND
+    a selected region. This is what makes the onboarding chips actually constrain the tour
+    (a 'Modern' tour contains only post-1900 works; an 'Egypt' tour only Egyptian ones)."""
+    out = pool
+    if eras:
+        out = [o for o in out if classify_era(o.get("date")) in eras]
+    if regions:
+        out = [o for o in out if countries.match(o, regions)]
+    return out
+
+
 def select_candidates(
-    minutes: int, themes: list[str], level: str, must_see: bool, eras: list[str] | None = None
+    minutes: int,
+    themes: list[str],
+    level: str,
+    must_see: bool,
+    eras: list[str] | None = None,
+    regions: list[str] | None = None,
 ):
     """Pick the works for a tour. Returns (n, candidates) where `candidates` is a ranked
     list of up to n + buffer stop dicts (unordered, no narration) so the caller can drop
-    imageless works and still assemble n imaged stops."""
+    imageless works and still assemble n imaged stops.
+
+    Era + region are HARD filters: we never pad a tour with works that don't match them —
+    a too-strict combination yields a shorter, honest tour instead. We only relax a filter
+    (region first, then era) if it would otherwise leave *nothing* to show."""
     eras = eras or []
+    regions = regions or []
     pool = load_pool()
     if not pool:
         return 0, []
 
     n = min(num_stops(minutes, level), len(pool))
-    allowed = _pick_departments(pool, themes, eras, department_budget(minutes))
-    candidates = [o for o in pool if o.get("departmentId") in allowed] or pool
+
+    # Hard filter, with graceful relaxation only when a combination empties the pool.
+    base = _filter_pool(pool, eras, regions)
+    if not base and regions:
+        base = _filter_pool(pool, eras, [])     # drop region constraint
+    if not base and eras:
+        base = _filter_pool(pool, [], regions)  # drop era constraint
+    if not base:
+        base = pool
+
+    allowed = _pick_departments(base, themes, eras, regions, department_budget(minutes))
+    candidates = [o for o in base if o.get("departmentId") in allowed] or base
     cap = min(len(candidates), n + _IMAGE_BUFFER)
 
-    ranked = sorted(candidates, key=lambda o: _score(o, themes, eras), reverse=True)
+    score = lambda o: _score(o, themes, eras, regions)  # noqa: E731
+    ranked = sorted(candidates, key=score, reverse=True)
     chosen: list[dict] = []
     chosen_ids: set[int] = set()
 
     if must_see:
-        for obj in sorted(
-            candidates, key=lambda o: (not o.get("isHighlight"), -_score(o, themes, eras))
-        ):
+        for obj in sorted(candidates, key=lambda o: (not o.get("isHighlight"), -score(o))):
             if len(chosen) >= cap or not obj.get("isHighlight"):
                 break
             if obj["objectID"] not in chosen_ids:
@@ -225,10 +263,15 @@ def finalize(stops: list[dict]) -> list[dict]:
 
 
 def build_itinerary(
-    minutes: int, themes: list[str], level: str, must_see: bool, eras: list[str] | None = None
+    minutes: int,
+    themes: list[str],
+    level: str,
+    must_see: bool,
+    eras: list[str] | None = None,
+    regions: list[str] | None = None,
 ) -> list[dict]:
     """Convenience for offline use/tests: select n works and finalize the route
     (no image filtering, no narration). The API hydrates images and narration separately."""
-    n, candidates = select_candidates(minutes, themes, level, must_see, eras)
+    n, candidates = select_candidates(minutes, themes, level, must_see, eras, regions)
     stops = finalize(candidates[:n])
     return stops

@@ -68,7 +68,8 @@ WORDS_PER_MINUTE = 150  # speaking pace, used to size scripts + estimate duratio
 
 # --- AI settings ------------------------------------------------------------
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
-CLAUDE_MODEL = "claude-sonnet-4-6"  # fast + cheap enough for many stops
+CLAUDE_MODEL = "claude-sonnet-4-6"           # quality, used for Q&A
+CLAUDE_FAST_MODEL = "claude-haiku-4-5"        # fast, used for per-stop narration/intro/voice
 
 # --- Voice: Cartesia (TTS + STT) --------------------------------------------
 CARTESIA_API_KEY = os.getenv("CARTESIA_API_KEY", "").strip()

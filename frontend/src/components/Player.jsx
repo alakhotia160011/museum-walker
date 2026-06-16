@@ -24,6 +24,45 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
   const mediaRef = useRef(null);          // MediaRecorder
   const streamRef = useRef(null);         // mic MediaStream
   const chunksRef = useRef([]);           // recorded audio chunks
+  const pendingPlayRef = useRef(null);    // narration play() deferred until a user gesture
+  const narrCacheRef = useRef(new Map()); // index -> Promise<narration>, so we generate each stop once
+
+  // Generate (or reuse) a stop's narration. Cached by index for this tour session so
+  // revisiting — or prefetching the next stop — never re-runs the model.
+  function getNarration(i) {
+    const cache = narrCacheRef.current;
+    if (!cache.has(i)) {
+      cache.set(
+        i,
+        narrate({ stop: stops[i], themes, level, vibe, language }).catch((e) => {
+          cache.delete(i);
+          throw e;
+        })
+      );
+    }
+    return cache.get(i);
+  }
+
+  // Browsers refuse a programmatic audio.play() that isn't tied to a user gesture, and our
+  // play() runs after an await (fetch), which drops that gesture credit on Safari/iOS. So if
+  // autoplay is refused, we stash the play() here and fire it on the visitor's very next
+  // interaction anywhere on the page — a tap or scroll, not a dedicated button. Once the
+  // <audio> element has played once, later stops autoplay with no tap at all.
+  useEffect(() => {
+    const fire = () => {
+      const p = pendingPlayRef.current;
+      if (p) { pendingPlayRef.current = null; p(); }
+    };
+    const opts = { capture: true };
+    window.addEventListener("pointerdown", fire, opts);
+    window.addEventListener("touchend", fire, opts);
+    window.addEventListener("keydown", fire, opts);
+    return () => {
+      window.removeEventListener("pointerdown", fire, opts);
+      window.removeEventListener("touchend", fire, opts);
+      window.removeEventListener("keydown", fire, opts);
+    };
+  }, []);
 
   function stopVoice() {
     if (audioRef.current) audioRef.current.pause();
@@ -44,7 +83,14 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
       if (url) {
         const el = isNarration ? audioRef.current : answerAudioRef.current;
         el.src = url;
-        try { await el.play(); if (isNarration) setPlaying(true); } catch (e) { /* autoplay blocked */ }
+        const playIt = () => el.play().then(() => { if (isNarration) setPlaying(true); }).catch(() => {});
+        try {
+          await el.play();
+          if (isNarration) setPlaying(true);
+        } catch (e) {
+          // Autoplay refused (no gesture credit). Speak on the visitor's next interaction.
+          if (isNarration) pendingPlayRef.current = playIt;
+        }
         return;
       }
     }
@@ -71,16 +117,26 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
     setTranscribing(false);
     setMicError("");
     narrationUrlRef.current = null;
+    pendingPlayRef.current = null;
     if (audioRef.current) audioRef.current.removeAttribute("src");
 
     let cancelled = false;
     (async () => {
       try {
-        const n = await narrate({ stop, themes, level, vibe, language });
+        const n = await getNarration(index);
         if (cancelled) return;
         setNarration(n);
         setLoadingNarration(false);
         speak(n.spoken || n.script, { isNarration: true, voiceId: n.voiceId }); // auto-play the artist's voice
+        // Warm the next stop in the background so moving on feels instant: generate its
+        // narration now, and pre-synthesize its audio so Cartesia has it cached.
+        if (index + 1 < stops.length) {
+          getNarration(index + 1)
+            .then((nn) => {
+              if (hasTts && nn) fetchAudioUrl(nn.spoken || nn.script, vibe, nn.voiceId, language).catch(() => {});
+            })
+            .catch(() => {});
+        }
       } catch (e) {
         if (!cancelled) setLoadingNarration(false);
       }

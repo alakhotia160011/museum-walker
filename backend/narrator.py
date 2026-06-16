@@ -5,7 +5,7 @@ prompt so multi-stop generation is cheap/fast). Falls back to a readable templat
 script when no key is present, so the app always works for a demo."""
 from __future__ import annotations
 
-from config import CLAUDE_MODEL, HAS_CLAUDE, WORDS_PER_MINUTE
+from config import CLAUDE_MODEL, CLAUDE_FAST_MODEL, HAS_CLAUDE, WORDS_PER_MINUTE
 
 VIBES = {
     "Storyteller": "a warm, vivid storyteller who hooks the listener with narrative and human detail",
@@ -146,7 +146,7 @@ def generate_script(stop: dict, themes: list[str], level: str, vibe: str, langua
     try:
         client = _get_client()
         resp = client.messages.create(
-            model=CLAUDE_MODEL,
+            model=CLAUDE_FAST_MODEL,
             max_tokens=900,
             system=[
                 {
@@ -349,7 +349,7 @@ def route_intro(summary: dict, level: str, vibe: str, themes=None, eras=None, la
     try:
         client = _get_client()
         resp = client.messages.create(
-            model=CLAUDE_MODEL,
+            model=CLAUDE_FAST_MODEL,
             max_tokens=300,
             system=[{"type": "text", "text": _INTRO_SYSTEM, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_prompt}],
