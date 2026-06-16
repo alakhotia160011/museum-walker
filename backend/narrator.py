@@ -5,7 +5,24 @@ prompt so multi-stop generation is cheap/fast). Falls back to a readable templat
 script when no key is present, so the app always works for a demo."""
 from __future__ import annotations
 
+import re
+
 from config import CLAUDE_MODEL, CLAUDE_FAST_MODEL, HAS_CLAUDE, WORDS_PER_MINUTE
+
+# All Claude output here is spoken aloud by TTS, so strip any markdown the model slips in
+# despite the prompt (faster models like Haiku are prone to a "# Heading" or "**bold**").
+_MD_HEADING = re.compile(r"^\s{0,3}#{1,6}\s*", re.MULTILINE)
+_MD_BULLET = re.compile(r"^\s{0,3}[-*+]\s+", re.MULTILINE)
+_MD_EMPH = re.compile(r"(\*\*|__|\*|_|`)")
+
+
+def _plain(text: str) -> str:
+    """Strip markdown so the text reads cleanly when spoken and shown as a plain passage."""
+    text = _MD_HEADING.sub("", text)
+    text = _MD_BULLET.sub("", text)
+    text = _MD_EMPH.sub("", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
 
 VIBES = {
     "Storyteller": "a warm, vivid storyteller who hooks the listener with narrative and human detail",
@@ -157,7 +174,7 @@ def generate_script(stop: dict, themes: list[str], level: str, vibe: str, langua
             ],
             messages=[{"role": "user", "content": user_prompt}],
         )
-        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+        text = _plain("".join(b.text for b in resp.content if getattr(b, "type", "") == "text"))
         if not text:
             raise ValueError("empty response")
         return {"script": text, "estSeconds": _est_seconds(text), "source": "claude"}
@@ -283,7 +300,7 @@ def answer_question(
             system=[{"type": "text", "text": _QA_SYSTEM, "cache_control": {"type": "ephemeral"}}],
             messages=messages,
         )
-        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+        text = _plain("".join(b.text for b in resp.content if getattr(b, "type", "") == "text"))
         if not text:
             raise ValueError("empty response")
         return {"answer": text, "source": "claude"}
@@ -354,7 +371,7 @@ def route_intro(summary: dict, level: str, vibe: str, themes=None, eras=None, la
             system=[{"type": "text", "text": _INTRO_SYSTEM, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_prompt}],
         )
-        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+        text = _plain("".join(b.text for b in resp.content if getattr(b, "type", "") == "text"))
         if not text:
             raise ValueError("empty response")
         return {"intro": text, "source": "claude"}
