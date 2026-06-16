@@ -48,7 +48,7 @@ export default function Compose({ themes, onCompose, error }) {
   );
 
   return (
-    <div className="screen">
+    <div className="screen screen--home">
       <div className="page stagger">
         <header className="masthead">
           <p className="eyebrow">The Metropolitan Museum of Art</p>

@@ -101,6 +101,26 @@ h1, h2, h3 { font-family: var(--serif); font-optical-sizing: auto; font-weight: 
 .section-head .label { font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-2); }
 .section-head .aside { margin-left: auto; font-size: 12px; letter-spacing: 0.04em; color: var(--ink-3); }
 
+/* ---------- home watermark ----------
+   Degas, "The Dance Class" (1874), Met Collection — public domain.
+   Pre-rendered to faint ink outlines (public/dance-class-outline.png) so the
+   home screen reads as a sketch-on-paper, not a photo. Fixed backdrop, behind
+   all content; home screen only. */
+.screen--home { position: relative; }
+.screen--home::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: url("/dance-class-outline-v2.png") center / cover no-repeat;
+  opacity: 0.4;
+  /* soften the viewport edges so there's no hard crop line */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 9%, #000 82%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent, #000 9%, #000 82%, transparent 100%);
+}
+.screen--home .page { position: relative; z-index: 1; }
+
 /* ---------- masthead ---------- */
 .masthead { margin-bottom: 8px; }
 .wordmark {
@@ -384,6 +404,9 @@ h1, h2, h3 { font-family: var(--serif); font-optical-sizing: auto; font-weight: 
    (a two-column layout let the tall plate overflow and overlap the controls). */
 @media (min-width: 880px) {
   .stop { max-width: 720px; margin-inline: auto; }
+  /* Desktop: let the colophon span the full measure instead of the tight
+     78ch column. Same text, same size — just wider, fewer lines. */
+  .masthead .colophon { max-width: none; text-wrap: pretty; }
 }
 
 /* ---------- motion: staggered fade-up on screen load ---------- */
