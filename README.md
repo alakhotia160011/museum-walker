@@ -4,7 +4,7 @@
 
 Tell the app **how long you have** and **what you care about**, and it composes a
 time-boxed, interest-tuned, *walkable* route through The Metropolitan Museum of Art,
-with a Claude-written narration for each stop, voiced by ElevenLabs (or your device).
+with a Claude-written narration for each stop, voiced by Cartesia (or your device).
 You can ask the on-screen docent questions about any work as you go. Built for people
 who don't have the time or attention span for a full audio guide.
 (Inspired by [Artlas](https://www.artlas.art/en).)
@@ -46,11 +46,13 @@ interactive Q&A layered on the player.
   invented facts), and **tuned to your tastes** - the type of art (themes) and the time
   periods (eras) you chose at onboarding - with multi-turn follow-ups and "where do I go
   next?" support.
-- **Voice** ([`tts.py`](backend/tts.py)) - ElevenLabs synth, cached by content hash. No
-  key → the browser's built-in speech synthesis. Q&A answers get their own play button.
-  One fixed voice (set by `ELEVENLABS_VOICE_ID`) speaks for every artist - the *words* are
-  in the artist's voice, but the *timbre* is the same narrator throughout. Per-artist voices
-  would need an artist→voice map and are not implemented.
+- **Voice** ([`tts.py`](backend/tts.py)) - Cartesia (Sonic) synth, cached by content hash;
+  multilingual, so it speaks the chosen language. No key → the browser's built-in speech
+  synthesis. **Per-artist voices** ([`voices.py`](backend/voices.py)) - voices are fetched
+  live from your Cartesia library (`GET /voices`) and matched to each maker's inferred
+  gender + regional accent (`country`), so different artists sound different. Accent matching
+  is English-only; other languages use the default voice. **STT** ([`stt.py`](backend/stt.py))
+  - "Ask the docent" records the mic and transcribes via Cartesia Ink-Whisper (`POST /stt`).
 
 ## Optimizing for location
 
@@ -90,7 +92,7 @@ the theoretical minimum, for comparable or shorter total walking distance.
 # Backend
 cd backend
 python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
-cp .env.example .env          # optional: add ANTHROPIC_API_KEY + ELEVENLABS_API_KEY
+cp .env.example .env          # optional: add ANTHROPIC_API_KEY + CARTESIA_API_KEY
 ./.venv/bin/python seed_pool.py   # build data/pool.json (downloads the ~300MB Open Access CSV once, then cached)
 ./.venv/bin/python seed_map.py    # build data/gallery_coords.json from the Living Map tiles
 ./.venv/bin/python app.py         # serves on :5050
@@ -104,7 +106,7 @@ npm run dev                   # http://localhost:5173 (proxies /api to :5050)
 `pool.json` and `gallery_coords.json` are committed, so you only need to re-run the seed
 scripts to refresh the data. Without API keys the app still runs fully: template narration,
 metadata-based Q&A fallback, and your device's voice. Add the keys to `backend/.env` for
-real Claude scripts/answers and ElevenLabs audio.
+real Claude scripts/answers and Cartesia audio.
 
 `seed_map.py` needs `mapbox-vector-tile` (a dev-only dependency, not required at runtime):
 `./.venv/bin/pip install mapbox-vector-tile`.
@@ -125,12 +127,12 @@ instance - fine, it's only a cache).
 Two settings to get right in the Vercel dashboard (Project → Settings):
 - **Root Directory** must be the repo root (empty), *not* `frontend/` - otherwise the
   build can't find `frontend/` and the Python API never deploys.
-- **Environment Variables** → add `ANTHROPIC_API_KEY` and `ELEVENLABS_API_KEY`
-  (optional: `ELEVENLABS_VOICE_ID`). Env vars only apply to **new** deployments, so
+- **Environment Variables** → add `ANTHROPIC_API_KEY` and `CARTESIA_API_KEY`
+  (optional: `CARTESIA_VOICE_ID`). Env vars only apply to **new** deployments, so
   redeploy after adding them. `/api/config` reports `hasClaude` / `hasTts`.
 
 Cost note: with keys set, every itinerary builds Claude scripts and every question/▶ is a
-live Claude/ElevenLabs call on your account - fine for a demo, worth knowing for a public link.
+live Claude/Cartesia call on your account - fine for a demo, worth knowing for a public link.
 
 ## Project layout
 
@@ -140,7 +142,7 @@ backend/
   curator.py       stop selection, wing clustering, floor-aware transitions
   geo.py           coordinate-aware route optimizer (building → floor → TSP)
   narrator.py      Claude narration scripts + "Ask the docent" Q&A (+ fallbacks)
-  tts.py           ElevenLabs synthesis, content-hash cached
+  tts.py           Cartesia synthesis, content-hash cached
   themes.py        interest themes → Met tag keywords
   eras.py          date-string parsing → historical-period buckets
   config.py        departments, timing, models, voice, per-tour wing budget

@@ -57,10 +57,11 @@ export async function askDocent({ stop, question, level, vibe, themes, eras, his
 
 // Transcribe a recorded question clip (Blob) to text via the server. Returns the text,
 // or "" if nothing was heard / STT is unavailable (caller falls back to typing).
-export async function transcribe(blob) {
+export async function transcribe(blob, language) {
   const fd = new FormData();
   const ext = (blob.type.includes("mp4") || blob.type.includes("mpeg")) ? "mp4" : "webm";
   fd.append("audio", blob, `question.${ext}`);
+  if (language) fd.append("language", language);
   const r = await fetch(`${BASE}/api/transcribe`, { method: "POST", body: fd });
   if (!r.ok) return "";
   const d = await r.json();
@@ -68,12 +69,13 @@ export async function transcribe(blob) {
 }
 
 // Returns an object URL for the mp3, or null if the server has no TTS (use browser voice).
-// `voiceId` selects the artist-matched ElevenLabs voice (from the narrate response).
-export async function fetchAudioUrl(text, vibe, voiceId) {
+// `voiceId` selects the artist-matched Cartesia voice (from the narrate response);
+// `language` is the visitor's language label (the server maps it to an ISO code).
+export async function fetchAudioUrl(text, vibe, voiceId, language) {
   const r = await fetch(`${BASE}/api/audio`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text, vibe, voiceId }),
+    body: JSON.stringify({ text, vibe, voiceId, language }),
   });
   if (r.status === 204) return null;
   if (!r.ok) return null;

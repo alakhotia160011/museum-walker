@@ -32,13 +32,13 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
     setPlaying(false);
   }
 
-  // Speak text aloud: ElevenLabs when available, else the browser voice.
+  // Speak text aloud: Cartesia when available, else the browser voice.
   async function speak(text, { isNarration, voiceId } = {}) {
     stopVoice();
     if (hasTts) {
       let url = isNarration ? narrationUrlRef.current : null;
       if (!url) {
-        url = await fetchAudioUrl(text, vibe, voiceId);
+        url = await fetchAudioUrl(text, vibe, voiceId, language);
         if (isNarration) narrationUrlRef.current = url;
       }
       if (url) {
@@ -132,7 +132,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
   }
 
-  // Record the mic, then transcribe server-side (ElevenLabs) and ask. Works in any
+  // Record the mic, then transcribe server-side (Cartesia) and ask. Works in any
   // browser that can record audio — the browser's own speech API is too unreliable.
   async function listen() {
     if (listening) { stopRecording(); return; }       // tap again = stop & send
@@ -162,7 +162,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
       if (!blob.size) return;
       setTranscribing(true);
       try {
-        const text = await transcribe(blob);
+        const text = await transcribe(blob, language);
         if (text) ask(text);
         else setMicError("I didn't catch that. Try again, or type your question below.");
       } catch (e) {
@@ -178,7 +178,7 @@ export default function Stop({ stops, index, setIndex, hasTts, hasClaude, vibe, 
   const essay = loadingNarration ? "Composing this stop…" : (narration?.script || "");
   const caption =
     `${(narration?.source === "claude") ? "In the artist's words, by Claude" : "In the artist's words, from the label"}` +
-    ` · ${hasTts ? "voiced by ElevenLabs" : "voiced in your browser"}`;
+    ` · ${hasTts ? "voiced by Cartesia" : "voiced in your browser"}`;
 
   return (
     <div className="screen">

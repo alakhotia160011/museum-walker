@@ -1,78 +1,60 @@
 """Per-artwork voice selection for TTS.
 
-Picks the best-fitting ElevenLabs voice for a stop from a small curated palette, so
-each artist (or the anonymous maker of a culture) speaks in a voice that roughly
-matches gender, age, and regional accent — instead of one fixed narrator for everyone.
+Picks the best-fitting Cartesia voice for a stop so each artist (or the anonymous maker
+of a culture) speaks in a voice that roughly matches gender and regional accent — instead
+of one fixed narrator for everyone.
 
-The palette uses ElevenLabs' stable premade voices, which are present on every account.
-That keeps the feature reliable and free of voice-generation latency, but it bounds
-accent coverage: European / anglophone makers match well (US, British, Irish, Australian,
-Italian, Nordic), while many world cultures (e.g. East Asian, Middle Eastern, African,
-Latin American) have no premade accent and fall back to a neutral voice with gender and
-age still matched. To improve accent coverage, add richer ElevenLabs Voice Library IDs to
-PALETTE with the appropriate `accent` tag — the scorer will use them automatically.
+Voices are fetched live from the account's Cartesia library (GET /voices, cached in
+memory) and matched on the real metadata Cartesia returns: `gender`
+(masculine/feminine/gender_neutral) and `country` (ISO-3166 alpha-2, the accent/locale).
+Accent matching is done within English voices; non-English narration uses the default
+voice with Cartesia's multilingual model handling the language. If /voices can't be
+reached, everything falls back to the configured/auto default voice.
 
-A voice profile {gender, age, region} is inferred per stop: Claude for documented named
-artists (it knows their gender, origin, and era), and a metadata heuristic for anonymous
-or cultural makers (region from the culture/department; gender and age stay 'unknown' —
-we never guess gender for an anonymous work).
+A voice profile {gender, age, region} is inferred per stop (age is currently unused —
+Cartesia exposes no age metadata): Claude for documented named artists (it knows their
+gender and origin), and a metadata heuristic for anonymous or cultural makers.
 """
 from __future__ import annotations
 
 import json
 
-from config import CLAUDE_MODEL, HAS_CLAUDE, ELEVENLABS_VOICE_ID
+import requests
 
-# Curated palette of ElevenLabs premade voices. accent ∈ {us, gb, ie, au, it, se}.
-# Each gender carries young/middle/old so age can always be matched within a gender.
-PALETTE = [
-    # --- female ---
-    {"voiceId": "21m00Tcm4TlvDq8ikWAM", "name": "Rachel",    "gender": "female", "accent": "us", "age": "young",  "tone": "calm"},
-    {"voiceId": "XB0fDUnXU5powFXDhCwa", "name": "Charlotte", "gender": "female", "accent": "se", "age": "young",  "tone": "warm"},
-    {"voiceId": "EXAVITQu4vr4xnSDxMaL", "name": "Sarah",     "gender": "female", "accent": "us", "age": "middle", "tone": "soft"},
-    {"voiceId": "XrExE9yKIg1WjnnlVkGX", "name": "Matilda",   "gender": "female", "accent": "us", "age": "middle", "tone": "warm"},
-    {"voiceId": "Xb7hH8MSUJpSbSDYk0k2", "name": "Alice",     "gender": "female", "accent": "gb", "age": "middle", "tone": "confident"},
-    {"voiceId": "pFZP5JQG7iQjIQuC4Bku", "name": "Lily",      "gender": "female", "accent": "gb", "age": "middle", "tone": "warm"},
-    {"voiceId": "oWAxZDx7w5VEj9dCyTzz", "name": "Grace",     "gender": "female", "accent": "us", "age": "old",    "tone": "gentle"},
-    # --- male ---
-    {"voiceId": "ErXwobaYiN019PkySvjV", "name": "Antoni",    "gender": "male",   "accent": "us", "age": "young",  "tone": "warm"},
-    {"voiceId": "CYw3kZ02Hs0563khs1Fj", "name": "Dave",      "gender": "male",   "accent": "gb", "age": "young",  "tone": "casual"},
-    {"voiceId": "zcAOhNBS3c14rBihAFp1", "name": "Giovanni",  "gender": "male",   "accent": "it", "age": "young",  "tone": "expressive"},
-    {"voiceId": "pNInz6obpgDQGcFmaJgB", "name": "Adam",      "gender": "male",   "accent": "us", "age": "middle", "tone": "deep"},
-    {"voiceId": "VR6AewLTigWG4xSOukaG", "name": "Arnold",    "gender": "male",   "accent": "us", "age": "middle", "tone": "crisp"},
-    {"voiceId": "onwK4e9ZLuTAKqWW03F9", "name": "Daniel",    "gender": "male",   "accent": "gb", "age": "middle", "tone": "authoritative"},
-    {"voiceId": "IKne3meq5aSn9XLyUdCD", "name": "Charlie",   "gender": "male",   "accent": "au", "age": "middle", "tone": "casual"},
-    {"voiceId": "N2lVS1w4EtoT3dr4eOWO", "name": "Callum",    "gender": "male",   "accent": "us", "age": "middle", "tone": "intense"},
-    {"voiceId": "JBFqnCBsd6RMkjVDRZzb", "name": "George",    "gender": "male",   "accent": "gb", "age": "old",    "tone": "warm"},
-    {"voiceId": "D38z5RcWu1voky8WS1ja", "name": "Fin",       "gender": "male",   "accent": "ie", "age": "old",    "tone": "weathered"},
-    {"voiceId": "pqHfZKP75CvOlQylNhV4", "name": "Bill",      "gender": "male",   "accent": "us", "age": "old",    "tone": "trustworthy"},
-]
+from config import (
+    CARTESIA_API_KEY,
+    CARTESIA_VERSION,
+    CARTESIA_VOICE_ID,
+    CLAUDE_MODEL,
+    HAS_CLAUDE,
+    HAS_TTS,
+)
 
-# Region token -> ordered preference of palette accents (best-fit first). For regions the
-# premade voices can't accent (Middle Eastern, Asian, African, Latin American) this is just
-# the least-wrong neutral fallback; gender and age still match.
+# Region token -> ordered preference of ISO-3166 alpha-2 country codes (best-fit first),
+# matched against the `country` of English Cartesia voices. Regions without a distinct
+# English accent fall back to a neutral US/GB voice (gender still matches).
 REGION_ACCENT = {
-    "north_american":  ["us", "gb"],
-    "british":         ["gb", "ie", "us"],
-    "irish":           ["ie", "gb", "us"],
-    "australian":      ["au", "gb", "us"],
-    "french":          ["it", "gb", "us"],
-    "italian":         ["it", "gb", "us"],
-    "iberian":         ["it", "gb", "us"],
-    "greek":           ["it", "gb", "us"],
-    "mediterranean":   ["it", "gb", "us"],
-    "german":          ["gb", "se", "us"],
-    "dutch":           ["gb", "se", "us"],
-    "nordic":          ["se", "gb", "us"],
-    "slavic":          ["se", "gb", "us"],
-    "middle_eastern":  ["gb", "us"],
-    "north_african":   ["gb", "us"],
-    "african":         ["us", "gb"],
-    "east_asian":      ["us", "gb"],
-    "south_asian":     ["gb", "us"],
-    "southeast_asian": ["us", "gb"],
-    "latin_american":  ["it", "us", "gb"],
-    "neutral":         ["us", "gb"],
+    "north_american":  ["US", "CA", "GB"],
+    "british":         ["GB", "IE", "US"],
+    "irish":           ["IE", "GB", "US"],
+    "australian":      ["AU", "GB", "US"],
+    "french":          ["FR", "GB", "US"],
+    "italian":         ["IT", "GB", "US"],
+    "iberian":         ["ES", "PT", "GB", "US"],
+    "greek":           ["GR", "IT", "GB", "US"],
+    "mediterranean":   ["IT", "GR", "GB", "US"],
+    "german":          ["DE", "GB", "US"],
+    "dutch":           ["NL", "GB", "US"],
+    "nordic":          ["SE", "NO", "DK", "GB", "US"],
+    "slavic":          ["RU", "PL", "GB", "US"],
+    "middle_eastern":  ["GB", "US"],
+    "north_african":   ["GB", "US"],
+    "african":         ["US", "GB"],
+    "east_asian":      ["US", "GB"],
+    "south_asian":     ["IN", "GB", "US"],
+    "southeast_asian": ["US", "GB"],
+    "latin_american":  ["ES", "US", "GB"],
+    "neutral":         ["US", "GB"],
 }
 REGIONS = list(REGION_ACCENT.keys())
 
@@ -121,8 +103,63 @@ def _heuristic_region(stop: dict) -> str:
     if "greek and roman" in dept:
         return "mediterranean"
     if "european" in dept or "medieval" in dept:
-        return "italian"  # generic continental-European stand-in within the premade palette
+        return "italian"  # generic continental-European stand-in
     return "neutral"
+
+
+# --- Cartesia voice library (fetched once, cached) ---------------------------
+_VOICES: list[dict] | None = None
+
+
+def _norm_gender(g: str | None) -> str:
+    g = (g or "").lower()
+    if g in ("masculine", "male", "man"):
+        return "male"
+    if g in ("feminine", "female", "woman"):
+        return "female"
+    return "unknown"
+
+
+def _load_voices() -> list[dict]:
+    """English Cartesia voices as [{id, gender, country}], fetched once and cached.
+    Empty if TTS is unconfigured or /voices can't be reached."""
+    global _VOICES
+    if _VOICES is not None:
+        return _VOICES
+    _VOICES = []
+    if not HAS_TTS:
+        return _VOICES
+    try:
+        r = requests.get(
+            "https://api.cartesia.ai/voices",
+            headers={"Authorization": f"Bearer {CARTESIA_API_KEY}", "Cartesia-Version": CARTESIA_VERSION},
+            params={"limit": 100},
+            timeout=20,
+        )
+        r.raise_for_status()
+        j = r.json()
+        items = j["data"] if isinstance(j, dict) and "data" in j else (j if isinstance(j, list) else [])
+        for v in items:
+            if (v.get("language") or "").lower() != "en":
+                continue
+            vid = v.get("id")
+            if vid:
+                _VOICES.append({"id": vid, "gender": _norm_gender(v.get("gender")),
+                                "country": (v.get("country") or "").upper()})
+    except requests.RequestException as e:
+        print(f"[voices] could not list Cartesia voices ({e})")
+    return _VOICES
+
+
+def default_voice_id() -> str:
+    """A sensible default voice: the configured one, else a feminine US voice, else any."""
+    if CARTESIA_VOICE_ID:
+        return CARTESIA_VOICE_ID
+    vs = _load_voices()
+    for v in vs:
+        if v["gender"] == "female" and v["country"] == "US":
+            return v["id"]
+    return vs[0]["id"] if vs else ""
 
 
 _profile_cache: dict[tuple, dict] = {}
@@ -150,8 +187,8 @@ def _infer_profile_claude(stop: dict) -> dict | None:
         f'Return JSON: {{"gender": "male"|"female"|"unknown", '
         f'"age": "young"|"middle"|"old"|"unknown", "region": one of [{regions}]}}\n'
         f"Rules:\n"
-        f"- If the maker is a documented individual, use their actual gender, the regional "
-        f"accent of their origin, and their approximate age while active (young/middle/old).\n"
+        f"- If the maker is a documented individual, use their actual gender and the regional "
+        f"accent of their origin.\n"
         f"- If the maker is Unknown, anonymous, or a culture/people, set gender and age to "
         f'"unknown" and choose region from the culture or department. Never guess a gender '
         f"for an anonymous work.\n"
@@ -198,16 +235,6 @@ def infer_profile(stop: dict) -> dict:
     return profile
 
 
-_AGE_ORDER = {"young": 0, "middle": 1, "old": 2}
-
-
-def _age_score(voice_age: str, want_age: str) -> int:
-    if want_age not in _AGE_ORDER:
-        return 0
-    gap = abs(_AGE_ORDER[voice_age] - _AGE_ORDER[want_age])
-    return {0: 3, 1: 1}.get(gap, 0)
-
-
 def _stable_hash(s: str) -> int:
     """Small deterministic hash (Python's built-in hash() is salted per process)."""
     h = 0
@@ -217,38 +244,40 @@ def _stable_hash(s: str) -> int:
 
 
 def select_voice(profile: dict, seed: str = "") -> str:
-    """Score the palette against a profile and return the best-fit ElevenLabs voiceId.
-    When several voices fit equally well, `seed` (the maker's identity) breaks the tie
-    deterministically, so different makers spread across the palette while the same maker
-    always lands on the same voice."""
+    """Score the fetched English voices against a profile and return the best-fit voice id.
+    Gender is a hard filter when known; accent (country) is the soft preference; `seed`
+    (the maker's identity) breaks ties deterministically so makers spread across voices."""
+    voices = _load_voices()
+    if not voices:
+        return default_voice_id()
+
     gender = profile.get("gender")
-    age = profile.get("age")
     prefs = REGION_ACCENT.get(profile.get("region") or "neutral", REGION_ACCENT["neutral"])
 
     scored: list[tuple[int, dict]] = []
-    for v in PALETTE:
-        # Gender is a hard filter when known (a male artist should not get a female voice).
-        if gender in ("male", "female") and v["gender"] != gender:
-            continue
+    for v in voices:
+        if gender in ("male", "female") and v["gender"] not in (gender, "unknown"):
+            continue  # don't give a male artist a clearly-female voice
         score = 0
-        if v["accent"] in prefs:
-            score += (len(prefs) - prefs.index(v["accent"])) * 2  # earlier pref = higher
-        score += _age_score(v["age"], age)
+        if v["country"] in prefs:
+            score += (len(prefs) - prefs.index(v["country"])) * 2  # earlier pref = higher
+        if gender in ("male", "female") and v["gender"] == gender:
+            score += 1  # prefer an exact gender match over an unknown-gender voice
         scored.append((score, v))
 
     if not scored:
-        return PALETTE[0]["voiceId"]
+        return default_voice_id()
     top = max(s for s, _ in scored)
     best = [v for s, v in scored if s == top]
-    return best[_stable_hash(seed) % len(best)]["voiceId"]
+    return best[_stable_hash(seed) % len(best)]["id"]
 
 
 def voice_for_stop(stop: dict) -> str:
-    """Resolve the ElevenLabs voiceId for a stop. Falls back to the configured default
-    voice if anything goes wrong, so audio always has a usable voice."""
+    """Resolve the Cartesia voice id for a stop. Falls back to the default voice if
+    anything goes wrong, so audio always has a usable voice."""
     try:
         seed = f"{stop.get('artist') or ''}|{stop.get('department') or ''}"
         return select_voice(infer_profile(stop), seed=seed)
     except Exception as e:
         print(f"[voices] voice_for_stop failed ({e}); using default voice")
-        return ELEVENLABS_VOICE_ID
+        return default_voice_id()

@@ -18,6 +18,16 @@ from themes import theme_list
 app = Flask(__name__)
 CORS(app)
 
+# Onboarding language labels -> ISO codes Cartesia accepts (TTS + STT).
+LANG_CODE = {
+    "english": "en", "spanish": "es", "french": "fr", "german": "de",
+    "italian": "it", "mandarin": "zh", "japanese": "ja", "hindi": "hi",
+}
+
+
+def _lang_code(label) -> str:
+    return LANG_CODE.get((label or "English").strip().lower(), "en")
+
 
 @app.get("/api/health")
 def health():
@@ -165,12 +175,13 @@ def ask():
 
 @app.post("/api/transcribe")
 def transcribe():
-    """Transcribe a recorded question clip to text (ElevenLabs Scribe). The client
+    """Transcribe a recorded question clip to text (Cartesia Ink-Whisper). The client
     records the mic and posts the audio as multipart 'audio'. Returns {text, ok}."""
     f = request.files.get("audio")
     if f is None:
         return jsonify({"error": "missing audio"}), 400
-    text = stt.transcribe(f.read(), f.filename or "question.webm", f.mimetype or "audio/webm")
+    language = _lang_code(request.form.get("language"))
+    text = stt.transcribe(f.read(), f.filename or "question.webm", f.mimetype or "audio/webm", language)
     return jsonify({"text": text or "", "ok": bool(text)})
 
 
@@ -182,9 +193,10 @@ def audio():
     text = (body.get("text") or "").strip()
     vibe = body.get("vibe", "Storyteller")
     voice_id = body.get("voiceId")
+    language = _lang_code(body.get("language"))
     if not text:
         return jsonify({"error": "missing text"}), 400
-    path = tts.synth(text, vibe, voice_id)
+    path = tts.synth(text, vibe, voice_id, language)
     if not path:
         return ("", 204)  # signal: client should use browser speech synthesis
     return send_file(path, mimetype="audio/mpeg")

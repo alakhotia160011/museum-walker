@@ -70,10 +70,13 @@ WORDS_PER_MINUTE = 150  # speaking pace, used to size scripts + estimate duratio
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 CLAUDE_MODEL = "claude-sonnet-4-6"  # fast + cheap enough for many stops
 
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
-# "Rachel" - a common default ElevenLabs voice id.
-ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "").strip() or "21m00Tcm4TlvDq8ikWAM"
-ELEVENLABS_MODEL = "eleven_turbo_v2_5"
+# --- Voice: Cartesia (TTS + STT) --------------------------------------------
+CARTESIA_API_KEY = os.getenv("CARTESIA_API_KEY", "").strip()
+# Optional default voice id (UUID). If blank, voices.py picks one from /voices.
+CARTESIA_VOICE_ID = os.getenv("CARTESIA_VOICE_ID", "").strip()
+CARTESIA_MODEL = os.getenv("CARTESIA_MODEL", "").strip() or "sonic-2"  # multilingual TTS
+CARTESIA_STT_MODEL = "ink-whisper"
+CARTESIA_VERSION = "2026-03-01"  # required Cartesia-Version header
 
 HAS_CLAUDE = bool(ANTHROPIC_API_KEY)
-HAS_TTS = bool(ELEVENLABS_API_KEY)
+HAS_TTS = bool(CARTESIA_API_KEY)
