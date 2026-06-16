@@ -185,6 +185,33 @@ def transcribe():
     return jsonify({"text": text or "", "ok": bool(text)})
 
 
+@app.get("/api/debug/voices")
+def debug_voices():
+    """Temporary: inspect what Cartesia /voices returns on this account."""
+    import requests as _rq
+    from collections import Counter
+    from config import CARTESIA_API_KEY, CARTESIA_VERSION
+    try:
+        r = _rq.get("https://api.cartesia.ai/voices",
+                    headers={"Authorization": f"Bearer {CARTESIA_API_KEY}", "Cartesia-Version": CARTESIA_VERSION},
+                    params={"limit": 100}, timeout=20)
+        j = r.json()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    items = j["data"] if isinstance(j, dict) and "data" in j else (j if isinstance(j, list) else [])
+    en = [v for v in items if (v.get("language") or "").lower() == "en"]
+    return jsonify({
+        "status": r.status_code,
+        "envelope_keys": list(j.keys()) if isinstance(j, dict) else None,
+        "total_returned": len(items),
+        "english_count": len(en),
+        "lang_hist": dict(Counter((v.get("language") or "?") for v in items)),
+        "en_country_hist": dict(Counter((v.get("country") or "?") for v in en)),
+        "en_gender_hist": dict(Counter((v.get("gender") or "?") for v in en)),
+        "sample": [{k: v.get(k) for k in ("id", "name", "language", "country", "gender", "is_public", "is_owner")} for v in items[:8]],
+    })
+
+
 @app.post("/api/audio")
 def audio():
     """Synthesize (or serve cached) speech for a script. Stateless: the client posts

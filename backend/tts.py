@@ -49,8 +49,8 @@ def synth(text: str, vibe: str = "Storyteller", voice_id: str | None = None, lan
     if out.exists():
         return out
 
-    try:
-        r = requests.post(
+    def _post(voice_id: str):
+        return requests.post(
             _TTS_URL,
             headers={
                 "Authorization": f"Bearer {CARTESIA_API_KEY}",
@@ -60,16 +60,31 @@ def synth(text: str, vibe: str = "Storyteller", voice_id: str | None = None, lan
             json={
                 "model_id": CARTESIA_MODEL,
                 "transcript": text,
-                "voice": {"mode": "id", "id": vid},
+                "voice": {"mode": "id", "id": voice_id},
                 "language": language or "en",
                 "output_format": {"container": "mp3", "sample_rate": 44100, "bit_rate": 128000},
             },
             timeout=120,
         )
-        r.raise_for_status()
-    except requests.RequestException as e:
-        print(f"[tts] Cartesia failed: {e}")
-        return None
 
-    out.write_bytes(r.content)
+    content = None
+    for candidate in [vid, voices.default_voice_id()]:
+        if not candidate:
+            continue
+        try:
+            r = _post(candidate)
+            r.raise_for_status()
+            content = r.content
+            break
+        except requests.RequestException as e:
+            # A bad/unsupported voice shouldn't drop us to the browser voice — retry
+            # once with the default Cartesia voice before giving up.
+            print(f"[tts] Cartesia voice {candidate} failed: {e}")
+            if candidate == vid and candidate != voices.default_voice_id():
+                continue
+            return None
+
+    if not content:
+        return None
+    out.write_bytes(content)
     return out
